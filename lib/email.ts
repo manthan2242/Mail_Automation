@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import nodemailer from 'nodemailer';
+import { APP_CONFIG, SMTP_DEFAULTS } from './constants';
 
 console.log('[DEBUG] SMTP User:', process.env.EMAIL_USER);
 
@@ -17,8 +18,8 @@ export const sendEmail = async (
 ) => {
   let user = process.env.EMAIL_USER || process.env.SMTP_USER;
   let pass = process.env.EMAIL_PASS || process.env.SMTP_PASS;
-  let host = process.env.SMTP_HOST || 'smtp.gmail.com';
-  let port = parseInt(process.env.SMTP_PORT || '587');
+  let host = process.env.SMTP_HOST || SMTP_DEFAULTS.HOST;
+  let port = parseInt(process.env.SMTP_PORT || SMTP_DEFAULTS.PORT.toString());
   let service: string | undefined = host.includes('gmail') ? 'gmail' : undefined;
 
   // Database Fallback: If environment variables are missing or placeholders, try to find a configuration in the DB
@@ -64,7 +65,7 @@ export const sendEmail = async (
   });
 
   const mailOptions: nodemailer.SendMailOptions = {
-    from: replyTo ? `"${replyTo}" <${user}>` : `"Sales Force Pro" <${user}>`,
+    from: replyTo ? `"${replyTo}" <${user}>` : `"${APP_CONFIG.NAME}" <${user}>`,
     to,
     subject,
     html: text?.replace(/\n/g, '<br/>'), // Convert line breaks to HTML for proper formatting

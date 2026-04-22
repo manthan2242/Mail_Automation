@@ -13,6 +13,7 @@ import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
 import { motion } from 'motion/react';
 import { cn } from '@/lib/utils';
+import { AUTH_CONFIG } from '@/lib/constants';
 
 interface Employee {
   id: string;
@@ -286,7 +287,7 @@ export default function EmployeesPage() {
                 </div>
                 <div className="p-4 bg-[#f8fafc] rounded-xl border border-[#e2e8f0] text-[11px] text-[#64748b]">
                   <p className="font-bold text-[#1e293b] mb-1 uppercase tracking-wider">Default Credentials:</p>
-                  <p>Password: {newEmployee.username || '{username}'}@123</p>
+                  <p>Password: {AUTH_CONFIG.DEFAULT_PASSWORD_TEMPLATE(newEmployee.username || '{username}')}</p>
                   <p className="mt-1 italic">Employee will be forced to change this on first login.</p>
                 </div>
                 <Button type="submit" className="w-full bg-[#6366f1] hover:bg-[#4f46e5] text-white rounded-xl py-6 font-bold shadow-sm shadow-indigo-100">

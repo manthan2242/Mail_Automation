@@ -5,12 +5,20 @@ const prisma = new PrismaClient({});
 
 async function main() {
   // ── 1. Seed Admin ──────────────────────────────────────────────
-  const adminPassword = await bcrypt.hash('Admin@123', 10);
+  const adminEmail = process.env.SYSTEM_ADMIN_EMAIL;
+  const adminRawPassword = process.env.SYSTEM_ADMIN_PASSWORD;
+  
+  if (!adminEmail || !adminRawPassword) {
+    throw new Error('SYSTEM_ADMIN_EMAIL and SYSTEM_ADMIN_PASSWORD must be set in .env for seeding.');
+  }
+
+  const adminPassword = await bcrypt.hash(adminRawPassword, 10);
+  
   const admin = await prisma.admin.upsert({
-    where: { email: 'admin@mail.com' },
+    where: { email: adminEmail },
     update: {},
     create: {
-      email: 'admin@mail.com',
+      email: adminEmail,
       password: adminPassword,
       name: 'System Admin',
     },
@@ -18,27 +26,8 @@ async function main() {
   console.log('✅ Seeded admin:', admin.email);
 
   // ── 2. Seed Example Email Accounts (EmailConfig) ───────────────
-  const emailAccounts = [
-    {
-      host: 'smtp.gmail.com',
-      port: 587,
-      email: 'noreply@salesforcepro.com',
-      password: 'app-password-here',
-    },
-    {
-      host: 'smtp.gmail.com',
-      port: 587,
-      email: 'support@salesforcepro.com',
-      password: 'app-password-here',
-    },
-    {
-      host: 'smtp.gmail.com',
-      port: 587,
-      email: 'sales@salesforcepro.com',
-      password: 'app-password-here',
-    },
-  ];
-
+  const emailAccounts = []; // No longer seeding hardcoded accounts
+  
   const createdConfigs = [];
   for (const acc of emailAccounts) {
     const config = await prisma.emailConfig.upsert({
@@ -51,19 +40,27 @@ async function main() {
   }
 
   // ── 3. Seed Sample Employee ────────────────────────────────────
-  const empPassword = await bcrypt.hash('Employee@123', 10);
-  const employee = await prisma.employee.upsert({
-    where: { email: 'employee@mail.com' },
-    update: {},
-    create: {
-      email: 'employee@mail.com',
-      username: 'employee01',
-      password: empPassword,
-      name: 'Sample Employee',
-      isFirstLogin: false,
-    },
-  });
-  console.log('✅ Seeded employee:', employee.email);
+  const empEmail = process.env.SAMPLE_EMPLOYEE_EMAIL;
+  const empRawPassword = process.env.SAMPLE_EMPLOYEE_PASSWORD;
+
+  if (!empEmail || !empRawPassword) {
+    console.warn('⚠️ SAMPLE_EMPLOYEE_EMAIL or SAMPLE_EMPLOYEE_PASSWORD not set. Skipping employee seed.');
+  } else {
+    const empPassword = await bcrypt.hash(empRawPassword, 10);
+
+    const employee = await prisma.employee.upsert({
+      where: { email: empEmail },
+      update: {},
+      create: {
+        email: empEmail,
+        username: 'employee01',
+        password: empPassword,
+        name: 'Sample Employee',
+        isFirstLogin: false,
+      },
+    });
+    console.log('✅ Seeded employee:', employee.email);
+  }
 
   // ── 4. Assign email accounts to the sample employee ────────────
   for (const config of createdConfigs) {
@@ -85,8 +82,8 @@ async function main() {
 
   console.log('\n🎉 Seed complete!');
   console.log('────────────────────────────────────────────');
-  console.log('Admin Login:    admin@mail.com  /  Admin@123');
-  console.log('Employee Login: employee@mail.com  /  Employee@123');
+  console.log(`Admin Login:    ${adminEmail}  /  ${adminRawPassword}`);
+  console.log(`Employee Login: ${empEmail}  /  ${empRawPassword}`);
   console.log('────────────────────────────────────────────');
 }
 

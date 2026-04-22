@@ -12,14 +12,13 @@ import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
 import { motion } from 'motion/react';
 import { useRouter } from 'next/navigation';
-
-const FIXED_SENDER = 'hr.sambhavai@gmail.com';
+import { APP_CONFIG } from '@/lib/constants';
 
 export default function GenerateEmailPage() {
   const [subject, setSubject] = useState('');
   const [body, setBody] = useState('');
   const [recipient, setRecipient] = useState('');
-  const [sourceEmail] = useState(FIXED_SENDER);
+  const [sourceEmail] = useState(APP_CONFIG.DEFAULT_SENDER);
   const [generating, setGenerating] = useState(false);
   const [sending, setSending] = useState(false);
   const { token, user } = useAuth();
@@ -46,7 +45,7 @@ export default function GenerateEmailPage() {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`
         },
-        body: JSON.stringify({ subject, sourceEmail: FIXED_SENDER }),
+        body: JSON.stringify({ subject, sourceEmail: APP_CONFIG.DEFAULT_SENDER }),
       });
       const data = await res.json();
       if (res.ok) {
@@ -79,7 +78,7 @@ export default function GenerateEmailPage() {
           subject,
           body,
           to: recipient,
-          fromEmail: FIXED_SENDER
+          fromEmail: APP_CONFIG.DEFAULT_SENDER
         }),
       });
       if (res.ok) {
@@ -123,7 +122,7 @@ export default function GenerateEmailPage() {
                 <div className="space-y-2">
                   <Label className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider">From Email</Label>
                   <Input
-                    value={FIXED_SENDER}
+                    value={sourceEmail}
                     readOnly
                     disabled
                     className="rounded-xl border-[#e2e8f0] h-12 bg-[#f8fafc] text-[#1e293b] font-medium cursor-not-allowed"

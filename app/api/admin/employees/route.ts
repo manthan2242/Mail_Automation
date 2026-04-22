@@ -2,6 +2,7 @@ import { prisma } from '@/lib/db';
 import { hashPassword } from '@/lib/password';
 import { sendEmail } from '@/lib/email';
 import { NextResponse } from 'next/server';
+import { APP_CONFIG, AUTH_CONFIG, EMAIL_SUBJECTS } from '@/lib/constants';
 
 export async function GET() {
   try {
@@ -32,11 +33,11 @@ export async function POST(request: Request) {
     email = email?.trim()?.toLowerCase() || '';
     username = username?.trim() || '';
     name = name?.trim() || '';
-
+ 
     // Default password: {username}@123
-    const defaultPassword = `${username}@123`;
+    const defaultPassword = AUTH_CONFIG.DEFAULT_PASSWORD_TEMPLATE(username);
     const hashedPassword = await hashPassword(defaultPassword);
-
+ 
     console.log('[API] POST /api/admin/employees - Creating employee:', email);
     const employee = await prisma.employee.create({
       data: {
@@ -48,19 +49,19 @@ export async function POST(request: Request) {
       },
     });
     console.log('[API] Success: Employee created in DB with ID:', employee.id);
-
+ 
     // Fetch the first available SMTP config to send the welcome email
     const smtpConfig = await prisma.emailConfig.findFirst();
-
+ 
     try {
       await sendEmail(
         email,
-        'Welcome to Mail Automation - Your Credentials',
+        EMAIL_SUBJECTS.WELCOME(APP_CONFIG.NAME),
         `Hello ${name},\n\nYour account has been created successfully.\n\n` +
         `Login Credentials:\n` +
         `Username: ${username}\n` +
         `Password: ${defaultPassword}\n\n` +
-        `Please login and change your password immediately: ${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/auth/login`,
+        `Please login and change your password immediately: ${APP_CONFIG.APP_URL}/auth/login`,
         undefined,
         smtpConfig?.id
       );

@@ -2,6 +2,7 @@ import { prisma } from '@/lib/db';
 import { verifyToken } from '@/lib/auth';
 import { sendEmail } from '@/lib/email';
 import { NextResponse } from 'next/server';
+import { APP_CONFIG, EMAIL_SUBJECTS } from '@/lib/constants';
 
 export async function POST(request: Request) {
   try {
@@ -50,7 +51,7 @@ export async function POST(request: Request) {
       try {
         await sendEmail(
           employeeToNotify.email,
-          `Email Sent: ${subject}`,
+          `${EMAIL_SUBJECTS.EMAIL_SENT_NOTIFICATION}${subject}`,
           `Hi ${employeeToNotify.name},\n\nYour request for "${subject}" has been sent and delivered.`,
           undefined,
           undefined,
@@ -74,7 +75,7 @@ export async function POST(request: Request) {
       emailRecord = await prisma.email.create({
         data: {
           to,
-          fromEmail: fromEmail || process.env.EMAIL_USER || 'admin@system.com',
+          fromEmail: fromEmail || process.env.EMAIL_USER || APP_CONFIG.SYSTEM_EMAIL,
           subject,
           body,
           status: 'SENT',

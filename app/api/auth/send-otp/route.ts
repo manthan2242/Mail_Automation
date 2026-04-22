@@ -2,6 +2,7 @@ import { prisma } from '@/lib/db';
 import { verifyToken } from '@/lib/auth';
 import { sendEmail } from '@/lib/email';
 import { NextResponse } from 'next/server';
+import { EMAIL_SUBJECTS, AUTH_CONFIG, APP_CONFIG } from '@/lib/constants';
 
 export async function POST(request: Request) {
   try {
@@ -14,14 +15,14 @@ export async function POST(request: Request) {
     const recentOtp = await prisma.oTP.findFirst({
       where: { 
         email: payload.email,
-        createdAt: { gt: new Date(Date.now() - 60000) } // 60s cooldown
+        createdAt: { gt: new Date(Date.now() - AUTH_CONFIG.OTP_COOLDOWN_SECONDS * 1000) } // configurable cooldown
       }
     });
 
     if (recentOtp) {
       console.log(`[RESEND] Cooldown active for ${payload.email}`);
       return NextResponse.json({ 
-        error: "Please wait 60 seconds before requesting a new code.",
+        error: `Please wait ${AUTH_CONFIG.OTP_COOLDOWN_SECONDS} seconds before requesting a new code.`,
         success: false 
       }, { status: 429 });
     }
@@ -30,24 +31,28 @@ export async function POST(request: Request) {
     await prisma.oTP.deleteMany({ where: { email: payload.email } });
 
     const code = Math.floor(100000 + Math.random() * 900000).toString();
-    const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
+    const expiresAt = new Date(Date.now() + AUTH_CONFIG.OTP_EXPIRY_MINUTES * 60 * 1000);
+    const now = new Date();
 
     try {
       // Send BEFORE saving to database
       await sendEmail(
         payload.email,
-        'Your New Security Verification Code',
-        `Your new security verification OTP code is: ${code}. It will expire in exactly 5 minutes.`
+        EMAIL_SUBJECTS.OTP(APP_CONFIG.NAME),
+        `Your security verification OTP code is: ${code}. This code will expire in ${AUTH_CONFIG.OTP_EXPIRY_MINUTES} minutes.`,
+        undefined,
+        undefined,
+        true // noBcc: true
       );
-
+      
+      // 3. Save to DB AFTER successful send
       await prisma.oTP.create({
         data: {
           email: payload.email,
           code,
-          expiresAt,
-        },
+          expiresAt: new Date(now.getTime() + AUTH_CONFIG.OTP_EXPIRY_MINUTES * 60 * 1000), 
+        }
       });
-
       console.log("[RESEND SUCCESS] New OTP Transmitted to:", payload.email);
       return NextResponse.json({ success: true, message: 'Official verification code sent safely.' });
     } catch (e: any) {

@@ -17,6 +17,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { motion } from 'motion/react';
 import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
+import { APP_CONFIG } from '@/lib/constants';
 
 interface Email {
   id: string;
@@ -499,7 +500,7 @@ export default function EmailMonitoringPage() {
                             {email.employee ? email.employee.name : 'System Admin'}
                           </span>
                           <span className="text-[10px] text-[#64748b]">
-                            {email.employee ? email.employee.email : 'admin@system.com'}
+                            {email.employee ? email.employee.email : APP_CONFIG.SYSTEM_EMAIL}
                           </span>
                         </div>
                       </div>
