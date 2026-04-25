@@ -2,7 +2,6 @@ import { prisma } from '@/lib/db';
 import { signToken } from '@/lib/auth';
 import { comparePassword } from '@/lib/password';
 import { NextResponse } from 'next/server';
-import { APP_CONFIG, AUTH_CONFIG, EMAIL_SUBJECTS } from '@/lib/constants';
 
 export async function POST(request: Request) {
   try {
@@ -42,17 +41,16 @@ export async function POST(request: Request) {
       const method = (user as any).twoFactorMethod || 'email';
       
       if (method === 'email') {
-        // 1. Check for the LATEST OTP to implement cooldown
+        // 1. Check for the LATEST OTP to implement 60s rate limiting
         const latestOtp = await prisma.oTP.findFirst({
           where: { email: user.email },
           orderBy: { createdAt: 'desc' }
         });
 
         const now = new Date();
-        const cooldownMs = AUTH_CONFIG.OTP_COOLDOWN_SECONDS * 1000;
-        const cooldownCutoff = new Date(now.getTime() - cooldownMs);
+        const sixtySecondsAgo = new Date(now.getTime() - 60 * 1000);
 
-        if (latestOtp && latestOtp.createdAt > cooldownCutoff) {
+        if (latestOtp && latestOtp.createdAt > sixtySecondsAgo) {
           console.log(`[AUTH RATE LIMIT] Throttling OTP request for: ${user.email}`);
           // We let them proceed but don't send a new one yet if one was JUST sent
         } else {
@@ -62,11 +60,11 @@ export async function POST(request: Request) {
           try {
             console.log(`[AUTH] Dispatching OTP ONLY to login email: ${user.email}`);
             
-            // 2. Send with noBcc: true to prevent duplicates in SMTP box
+            // 2. Send with noBcc: true (6th argument) to prevent duplicates in SMTP box
             await sendEmail(
               user.email,
-              EMAIL_SUBJECTS.OTP(APP_CONFIG.NAME),
-              `Your security verification OTP code is: ${code}. This code will expire in ${AUTH_CONFIG.OTP_EXPIRY_MINUTES} minutes.`,
+              'Security Verification - Your OTP Code',
+              `Your security verification OTP code is: ${code}. This code will expire in 5 minutes.`,
               undefined,
               undefined,
               true // noBcc: true
@@ -77,7 +75,7 @@ export async function POST(request: Request) {
               data: {
                 email: user.email,
                 code,
-                expiresAt: new Date(now.getTime() + AUTH_CONFIG.OTP_EXPIRY_MINUTES * 60 * 1000), 
+                expiresAt: new Date(now.getTime() + 5 * 60 * 1000), 
               }
             });
             
@@ -113,13 +111,9 @@ export async function POST(request: Request) {
       method: (user as any).twoFactorMethod || 'email'
     });
 
-    const isHttps = 
-      request.headers.get('x-forwarded-proto') === 'https' || 
-      request.url.startsWith('https:');
-
     response.cookies.set('token', token, {
       httpOnly: true,
-      secure: isHttps,
+      secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
       maxAge: 60 * 60 * 24, // 1 day
       path: '/',

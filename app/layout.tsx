@@ -7,7 +7,7 @@ import { Toaster } from 'sonner';
 const geist = Geist({subsets:['latin'],variable:'--font-sans'});
 
 export const metadata: Metadata = {
-  title: 'Mail Automation',
+  title: process.env.NEXT_PUBLIC_APP_NAME!,
   description: 'Production-grade Email Automation Management',
 };
 

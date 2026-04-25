@@ -1,7 +1,9 @@
 import * as jose from 'jose';
-import { AUTH_CONFIG } from './constants';
-
-const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET || AUTH_CONFIG.JWT_SECRET_FALLBACK);
+const secret = process.env.JWT_SECRET;
+if (!secret) {
+  throw new Error('JWT_SECRET is not defined in environment variables.');
+}
+const JWT_SECRET = new TextEncoder().encode(secret);
 
 export interface JWTPayload {
   id: string;
@@ -14,7 +16,7 @@ export const signToken = async (payload: JWTPayload) => {
   return await new jose.SignJWT({ ...payload })
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
-    .setExpirationTime(AUTH_CONFIG.JWT_EXPIRATION)
+    .setExpirationTime('1d')
     .sign(JWT_SECRET);
 };
 
@@ -26,3 +28,4 @@ export const verifyToken = async (token: string) => {
     return null;
   }
 };
+

@@ -1,38 +1,32 @@
 /**
- * Application-wide constants and fallback values.
- * Moving hardcoded strings here makes the app more maintainable and configurable.
+ * Global application constants.
+ * NEXT_PUBLIC_* vars are available client + server.
+ * Non-prefixed vars are server-only — guards use typeof window check.
  */
 
-export const APP_CONFIG = {
-  NAME: process.env.NEXT_PUBLIC_APP_NAME || 'Sales Force Pro',
-  DEFAULT_SENDER: process.env.NEXT_PUBLIC_DEFAULT_SENDER || '',
-  SYSTEM_EMAIL: process.env.NEXT_PUBLIC_SYSTEM_EMAIL || '',
-  SUPPORT_EMAIL: process.env.NEXT_PUBLIC_SUPPORT_EMAIL || '',
-  APP_URL: process.env.NEXT_PUBLIC_APP_URL || '',
-};
+if (!process.env.NEXT_PUBLIC_APP_NAME) throw new Error('NEXT_PUBLIC_APP_NAME is not defined');
+export const APP_NAME = process.env.NEXT_PUBLIC_APP_NAME;
 
-export const EMAIL_SUBJECTS = {
-  OTP: (appName: string) => `[${appName}] Verification Code`,
-  NOTIFICATION: (appName: string) => `Notification from ${appName}`,
-  DEFAULT_SUBJECT: (appName: string) => `New Message from ${appName}`,
-  WELCOME: (appName: string) => `Welcome to ${appName} - Your Credentials`,
-};
+if (!process.env.NEXT_PUBLIC_DEFAULT_DOMAINS) throw new Error('NEXT_PUBLIC_DEFAULT_DOMAINS is not defined');
+export const DEFAULT_DOMAINS = process.env.NEXT_PUBLIC_DEFAULT_DOMAINS.split(',');
 
-export const AUTH_CONFIG = {
-  OTP_COOLDOWN_SECONDS: 60,
-  OTP_EXPIRY_MINUTES: 5,
-  DEFAULT_PASSWORD_TEMPLATE: (username: string) => `${username}@123`,
-  JWT_SECRET_FALLBACK: process.env.JWT_SECRET_FALLBACK || '',
-  JWT_EXPIRATION: '1d',
-};
+if (!process.env.NEXT_PUBLIC_APP_URL) throw new Error('NEXT_PUBLIC_APP_URL is not defined');
+export const DEFAULT_APP_URL = process.env.NEXT_PUBLIC_APP_URL;
 
-export const SMTP_DEFAULTS = {
-  HOST: process.env.SMTP_HOST_FALLBACK || '',
-  PORT: parseInt(process.env.SMTP_PORT_FALLBACK || '0'),
-};
+// Server-only constants — only validated when accessed on the server
+export const AI_MODEL_NAME = process.env.AI_MODEL_NAME || 'gemini-2.0-flash';
 
-export const AI_CONFIG = {
-  MODEL_NAME: process.env.AI_MODEL_NAME || 'gemini-1.5-flash',
-  RETRIES: 5,
-};
+export const OTP_COOLDOWN_SECONDS = parseInt(process.env.OTP_COOLDOWN_SECONDS || '60');
+export const OTP_EXPIRY_MINUTES = parseInt(process.env.OTP_EXPIRY_MINUTES || '5');
 
+export const EMAIL_STATUS = {
+  PENDING: 'PENDING',
+  APPROVED: 'APPROVED',
+  REJECTED: 'REJECTED',
+  SENT: 'SENT',
+} as const;
+
+export const ROLES = {
+  ADMIN: 'admin',
+  EMPLOYEE: 'employee',
+} as const;

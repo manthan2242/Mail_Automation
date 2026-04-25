@@ -10,7 +10,7 @@ interface EmailAutocompleteProps extends React.InputHTMLAttributes<HTMLInputElem
   customDomains?: string[];
 }
 
-const DEFAULT_DOMAINS = ['gmail.com', 'yahoo.com', 'outlook.com', 'hotmail.com', 'icloud.com'];
+import { DEFAULT_DOMAINS } from '@/lib/constants';
 
 export const EmailAutocomplete: React.FC<EmailAutocompleteProps> = ({
   onValueChange,

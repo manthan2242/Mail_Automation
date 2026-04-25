@@ -11,11 +11,13 @@ import { Key, Plus, Trash2, Copy, Check, Eye, EyeOff } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
 import { motion } from 'motion/react';
+import { cn } from '@/lib/utils';
 
 interface APIKey {
   id: string;
   name: string;
-  key: string;
+  maskedKey: string;
+  isActive: boolean;
   createdAt: string;
 }
 
@@ -23,8 +25,9 @@ export default function APIKeysPage() {
   const [keys, setKeys] = useState<APIKey[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAddOpen, setIsAddOpen] = useState(false);
+  const [isSuccessOpen, setIsSuccessOpen] = useState(false);
   const [newName, setNewName] = useState('');
-  const [visibleKeys, setVisibleKeys] = useState<Record<string, boolean>>({});
+  const [generatedKey, setGeneratedKey] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const { token } = useAuth();
 
@@ -57,11 +60,15 @@ export default function APIKeysPage() {
         },
         body: JSON.stringify({ name: newName }),
       });
+      const data = await res.json();
       if (res.ok) {
-        toast.success('API Key generated');
+        setGeneratedKey(data.rawKey);
         setIsAddOpen(false);
+        setIsSuccessOpen(true);
         setNewName('');
         fetchKeys();
+      } else {
+        toast.error(data.error || 'Failed to generate');
       }
     } catch (error) {
       toast.error('Failed to generate API key');
@@ -88,15 +95,23 @@ export default function APIKeysPage() {
     }
   };
 
-  const copyToClipboard = (text: string, id: string) => {
-    navigator.clipboard.writeText(text);
-    setCopiedId(id);
-    toast.success('Copied to clipboard');
-    setTimeout(() => setCopiedId(null), 2000);
-  };
-
-  const toggleVisibility = (id: string) => {
-    setVisibleKeys(prev => ({ ...prev, [id]: !prev[id] }));
+  const toggleStatus = async (id: string, currentStatus: boolean) => {
+    try {
+      const res = await fetch('/api/admin/api-keys', {
+        method: 'PATCH',
+        headers: { 
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ id, isActive: !currentStatus }),
+      });
+      if (res.ok) {
+        toast.success('Status updated');
+        fetchKeys();
+      }
+    } catch (error) {
+      toast.error('Failed to update status');
+    }
   };
 
   return (
@@ -140,6 +155,43 @@ export default function APIKeysPage() {
           </Dialog>
         </div>
 
+        <Dialog open={isSuccessOpen} onOpenChange={setIsSuccessOpen}>
+          <DialogContent className="sm:max-w-[500px] bg-white rounded-2xl p-8 space-y-6">
+            <DialogHeader>
+              <div className="mx-auto w-12 h-12 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mb-4">
+                <Check className="w-6 h-6" />
+              </div>
+              <DialogTitle className="text-2xl font-bold text-center text-slate-900">Key Generated Successfully</DialogTitle>
+              <CardDescription className="text-center text-amber-600 font-medium pt-2">
+                ⚠️ IMPORTANT: Copy this key now. It will never be shown again.
+              </CardDescription>
+            </DialogHeader>
+            <div className="bg-slate-50 rounded-xl p-4 border border-slate-100 flex items-center gap-3">
+              <code className="flex-1 text-sm font-mono text-indigo-600 break-all select-all font-bold">
+                {generatedKey}
+              </code>
+              <Button 
+                variant="outline"
+                className="rounded-lg border-slate-200"
+                onClick={() => {
+                  if (generatedKey) {
+                    navigator.clipboard.writeText(generatedKey);
+                    toast.success('Key copied!');
+                  }
+                }}
+              >
+                <Copy className="w-4 h-4" />
+              </Button>
+            </div>
+            <Button 
+              className="w-full bg-slate-900 hover:bg-slate-800 text-white rounded-xl py-6"
+              onClick={() => setIsSuccessOpen(false)}
+            >
+              I have saved my key
+            </Button>
+          </DialogContent>
+        </Dialog>
+
         <div className="grid grid-cols-1 gap-4">
           {loading ? (
             <p className="text-slate-500">Loading API keys...</p>
@@ -171,39 +223,37 @@ export default function APIKeysPage() {
                     </div>
                     
                     <div className="flex-1 max-w-md">
-                      <div className="flex items-center bg-slate-50 rounded-lg px-3 py-2 border border-slate-100">
-                        <code className="flex-1 text-sm font-mono text-slate-600 truncate">
-                          {visibleKeys[key.id] ? key.key : '••••••••••••••••••••••••••••••••'}
+                      <div className="flex items-center bg-slate-50 rounded-lg px-3 py-2 border border-slate-100 opacity-75">
+                        <code className="flex-1 text-sm font-mono text-slate-500 truncate">
+                          {key.maskedKey}
                         </code>
-                        <div className="flex items-center ml-2 space-x-1">
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="h-8 w-8 text-slate-400 hover:text-slate-600"
-                            onClick={() => toggleVisibility(key.id)}
-                          >
-                            {visibleKeys[key.id] ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                          </Button>
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="h-8 w-8 text-slate-400 hover:text-indigo-600"
-                            onClick={() => copyToClipboard(key.key, key.id)}
-                          >
-                            {copiedId === key.id ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
-                          </Button>
-                        </div>
+                        {!key.isActive && (
+                          <span className="ml-2 text-[10px] font-bold text-rose-500 uppercase">Inactive</span>
+                        )}
                       </div>
                     </div>
 
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className="text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg"
-                      onClick={() => handleDelete(key.id)}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className={cn(
+                          "rounded-lg px-3 font-bold text-[10px] uppercase",
+                          key.isActive ? "text-emerald-600 hover:bg-emerald-50" : "text-slate-400 hover:bg-slate-50"
+                        )}
+                        onClick={() => toggleStatus(key.id, key.isActive)}
+                      >
+                        {key.isActive ? 'Active' : 'Inactive'}
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg"
+                        onClick={() => handleDelete(key.id)}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
                   </CardContent>
                 </Card>
               </motion.div>

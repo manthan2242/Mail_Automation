@@ -17,7 +17,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { motion } from 'motion/react';
 import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
-import { APP_CONFIG } from '@/lib/constants';
+const FROM_EMAILS = (process.env.NEXT_PUBLIC_FROM_EMAILS || '').split(',').filter(Boolean);
 
 interface Email {
   id: string;
@@ -42,7 +42,7 @@ export default function EmailMonitoringPage() {
   const [loading, setLoading] = useState(true);
   const [selectedEmail, setSelectedEmail] = useState<Email | null>(null);
   const [adminComment, setAdminComment] = useState('');
-  const [selectedConfig, setSelectedConfig] = useState('');
+  const [selectedFromEmail, setSelectedFromEmail] = useState(FROM_EMAILS[0] || '');
   const [isActionOpen, setIsActionOpen] = useState(false);
   const [isComposeOpen, setIsComposeOpen] = useState(false);
   const [isEditDraftOpen, setIsEditDraftOpen] = useState(false);
@@ -137,7 +137,7 @@ export default function EmailMonitoringPage() {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`
         },
-        body: JSON.stringify({ emailId }),
+        body: JSON.stringify({ emailId, fromEmail: selectedFromEmail }),
       });
       const data = await res.json();
       if (res.ok) {
@@ -155,8 +155,7 @@ export default function EmailMonitoringPage() {
   };
 
   const handleGenerateBody = async () => {
-    const config = configs.find(c => c.id === selectedConfig);
-    const sourceEmail = config?.email;
+    const sourceEmail = selectedFromEmail;
     if (!sourceEmail || sourceEmail.trim() === "") {
       toast.error("Please select a 'From' email address");
       return;
@@ -194,8 +193,7 @@ export default function EmailMonitoringPage() {
 
   const handleSendCompose = async (e: React.FormEvent) => {
     e.preventDefault();
-    const config = configs.find(c => c.id === selectedConfig);
-    const sourceEmail = config?.email;
+    const sourceEmail = selectedFromEmail;
     if (!sourceEmail) {
       toast.error("Please select a 'From' email address");
       return;
@@ -287,10 +285,10 @@ export default function EmailMonitoringPage() {
                       <Button 
                         type="button"
                         onClick={handleGenerateBody} 
-                        disabled={genLoading || !selectedConfig}
+                        disabled={genLoading || !composeData.subject}
                         className={cn(
                           "rounded-xl px-4 whitespace-nowrap transition-all",
-                          !selectedConfig 
+                          !composeData.subject 
                             ? "bg-slate-100 text-slate-400 cursor-not-allowed" 
                             : "bg-indigo-50 text-indigo-600 hover:bg-indigo-100 border border-indigo-100"
                         )}
@@ -311,30 +309,16 @@ export default function EmailMonitoringPage() {
                   </div>
                   <div className="space-y-2">
                     <Label className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider">Send From</Label>
-                    <Select onValueChange={(val) => setSelectedConfig(val || '')} value={selectedConfig}>
-                      <SelectTrigger className="rounded-xl border-[#e2e8f0]">
-                        <SelectValue placeholder="Select sender account" />
+                    <Select onValueChange={(val) => setSelectedFromEmail(val || '')} value={selectedFromEmail}>
+                      <SelectTrigger className="w-full rounded-2xl border-[#e2e8f0] h-12 bg-[#f8fafc] text-[#64748b] font-medium shadow-none focus:ring-[#6366f1] px-4">
+                        <SelectValue placeholder="Select sender email" />
                       </SelectTrigger>
                       <SelectContent className="bg-white rounded-xl">
-                        {configs.length === 0 ? (
-                          <SelectItem value="none" disabled>No accounts configured</SelectItem>
-                        ) : (
-                          configs.map(c => (
-                            <SelectItem key={c.id} value={c.id}>{c.email}</SelectItem>
-                          ))
-                        )}
+                        {FROM_EMAILS.map(email => (
+                          <SelectItem key={email} value={email}>{email}</SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
-                    {configs.length === 0 && (
-                      <Button 
-                        variant="link" 
-                        size="sm" 
-                        className="text-[10px] text-indigo-600 p-0 h-auto font-bold"
-                        onClick={() => router.push('/admin/smtp')}
-                      >
-                        + Configure SMTP Account
-                      </Button>
-                    )}
                   </div>
 
                   <Button type="submit" className="w-full bg-[#6366f1] hover:bg-[#4f46e5] text-white rounded-xl py-6 font-bold shadow-lg shadow-indigo-100">
@@ -376,6 +360,7 @@ export default function EmailMonitoringPage() {
                     if (open) {
                       setSelectedEmail(email);
                       setAdminComment(email.adminComment || '');
+                      setSelectedFromEmail(email.fromEmail || FROM_EMAILS[0] || '');
                     }
                   }}>
                     <DialogTrigger
@@ -500,7 +485,7 @@ export default function EmailMonitoringPage() {
                             {email.employee ? email.employee.name : 'System Admin'}
                           </span>
                           <span className="text-[10px] text-[#64748b]">
-                            {email.employee ? email.employee.email : APP_CONFIG.SYSTEM_EMAIL}
+                            {email.employee ? email.employee.email : 'admin@system.com'}
                           </span>
                         </div>
                       </div>
@@ -514,6 +499,7 @@ export default function EmailMonitoringPage() {
                         if (open) {
                           setSelectedEmail(email);
                           setAdminComment(email.adminComment || '');
+                          setSelectedFromEmail(email.fromEmail || FROM_EMAILS[0] || '');
                         }
                       }}>
                         <DialogTrigger
@@ -594,7 +580,21 @@ export default function EmailMonitoringPage() {
                                 </div>
                                 <div>
                                   <h4 className="font-bold text-[#1e293b]">Email is Approved</h4>
-                                  <p className="text-sm text-[#64748b]">Click below to send this email to the recipient using the system SMTP configuration.</p>
+                                  <p className="text-sm text-[#64748b] mb-4">Confirm or change the sender before final delivery.</p>
+                                  
+                                  <div className="text-left space-y-2 mb-6">
+                                    <Label className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider">Final Sender Selection</Label>
+                                    <Select onValueChange={(val) => setSelectedFromEmail(val || '')} value={selectedFromEmail}>
+                                      <SelectTrigger className="w-full rounded-2xl border-[#e2e8f0] h-12 bg-[#f8fafc] text-[#64748b] font-medium shadow-none focus:ring-[#6366f1] px-4">
+                                        <SelectValue placeholder="Select sender email" />
+                                      </SelectTrigger>
+                                      <SelectContent className="bg-white rounded-xl">
+                                        {FROM_EMAILS.map(email => (
+                                          <SelectItem key={email} value={email}>{email}</SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
                                 </div>
                                 <Button 
                                   className="w-full bg-[#6366f1] hover:bg-[#4f46e5] text-white rounded-xl py-7 font-bold shadow-lg shadow-indigo-100"

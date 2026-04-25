@@ -1,10 +1,11 @@
 import { GoogleGenAI } from "@google/genai";
-import { AI_CONFIG } from "./constants";
+
+import { AI_MODEL_NAME } from './constants';
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY?.trim();
 const ai = GEMINI_API_KEY ? new GoogleGenAI({ apiKey: GEMINI_API_KEY }) : null;
 
-async function runWithRetry<T>(fn: () => Promise<T>, subject: string, fallback: string, retries: number = AI_CONFIG.RETRIES): Promise<T | string> {
+async function runWithRetry<T>(fn: () => Promise<T>, subject: string, fallback: string, retries: number = 5): Promise<T | string> {
   for (let i = 0; i < retries; i++) {
     try {
       return await fn();
@@ -53,7 +54,7 @@ STRICT RULES:
 - Output ONLY the email body text, nothing else`;
 
     const response = await ai.models.generateContent({
-      model: AI_CONFIG.MODEL_NAME,
+      model: AI_MODEL_NAME,
       contents: [{ role: 'user', parts: [{ text: prompt }] }]
     });
     return response.text;
@@ -74,7 +75,7 @@ export const generateAdminResponse = async (emailContent: string, action: 'appro
     Do not include preamble or multiple versions.`;
 
     const response = await ai.models.generateContent({
-      model: AI_CONFIG.MODEL_NAME,
+      model: AI_MODEL_NAME,
       contents: [{ role: 'user', parts: [{ text: prompt }] }]
     });
     return response.text;

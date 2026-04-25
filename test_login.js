@@ -1,10 +1,11 @@
 const { PrismaClient } = require('@prisma/client');
 const bcrypt = require('bcryptjs');
 
+require('dotenv').config();
 const prisma = new PrismaClient();
 
 async function main() {
-  const email = 'punamkhadse.sam@gmail.com';
+  const email = process.env.TEST_EMAIL;
   const employee = await prisma.employee.findUnique({ where: { email } });
   
   if (!employee) {

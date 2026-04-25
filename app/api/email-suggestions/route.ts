@@ -84,12 +84,12 @@ export async function GET(request: Request) {
 
     // 5. Domain Autocomplete (Gmail style)
     if (query.includes('@')) {
-      const DOMAINS = ['gmail.com', 'yahoo.com', 'outlook.com', 'hotmail.com', 'icloud.com'];
+      const { DEFAULT_DOMAINS } = require('@/lib/constants');
       const [prefix, domainPart] = query.split('@');
       if (prefix) {
-        const domainMatches = DOMAINS
-          .filter(d => d.startsWith(domainPart))
-          .map(d => ({ 
+        const domainMatches = DEFAULT_DOMAINS
+          .filter((d: string) => d.startsWith(domainPart))
+          .map((d: string) => ({ 
             name: `${prefix}@${d}`, 
             email: `${prefix}@${d}`, 
             type: 'domain_suggest' 

@@ -1,17 +1,16 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { hashPassword } from '@/lib/password';
-import { APP_CONFIG } from '@/lib/constants';
 
 export async function GET() {
   try {
     const adminPassword = await hashPassword('Admin@123');
     
     const admin = await prisma.admin.upsert({
-      where: { email: APP_CONFIG.SYSTEM_EMAIL },
+      where: { email: 'admin@salesforcepro.com' },
       update: {},
       create: {
-        email: APP_CONFIG.SYSTEM_EMAIL,
+        email: 'admin@salesforcepro.com',
         password: adminPassword,
         name: 'System Admin',
       },

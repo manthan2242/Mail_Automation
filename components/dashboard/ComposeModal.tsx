@@ -271,14 +271,14 @@ export default function ComposeModal({ onClose }: { onClose: () => void }) {
   };
 
   return (
-    <div className="fixed inset-x-0 bottom-0 sm:inset-x-auto sm:right-16 w-full sm:w-[600px] h-[100dvh] sm:h-[650px] z-[100] bg-white sm:rounded-t-xl shadow-2xl flex flex-col overflow-hidden border border-gray-200">
-      {/* Header */}
+    <div className="fixed inset-0 sm:inset-x-auto sm:inset-y-auto sm:bottom-0 sm:right-16 w-full sm:w-[600px] sm:h-[650px] z-[100] bg-white sm:rounded-t-xl shadow-2xl flex flex-col overflow-hidden border border-gray-200">
+      {/* Header - always pinned to top, X always visible */}
       <div className="bg-[#f2f6fc] px-4 py-3 flex justify-between items-center text-sm border-b border-gray-200 shrink-0">
         <span className="font-semibold text-gray-800">New Message</span>
         <div className="flex items-center gap-3 text-gray-500">
           <Minus className="w-4 h-4 cursor-pointer hover:text-gray-900 hidden sm:block" onClick={() => setIsMinimized(true)} />
           <Maximize2 className="w-4 h-4 cursor-pointer hover:text-gray-900 hidden sm:block" />
-          <X className="w-5 h-5 sm:w-4 sm:h-4 cursor-pointer hover:text-gray-900" onClick={onClose} />
+          <X className="w-6 h-6 sm:w-4 sm:h-4 cursor-pointer hover:text-gray-900 text-gray-700" onClick={onClose} />
         </div>
       </div>
 
@@ -372,7 +372,7 @@ export default function ComposeModal({ onClose }: { onClose: () => void }) {
         </div>
       </div>
 
-      {/* Bottom Actions - Optimized for Mobile */}
+      {/* Bottom Actions - Optimized for Mobile, no extra bottom gap */}
       <div className="px-3 sm:px-4 py-3 bg-white border-t border-gray-100 shrink-0">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1 sm:gap-2">
