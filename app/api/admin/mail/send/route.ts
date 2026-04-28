@@ -34,8 +34,7 @@ export async function POST(request: Request) {
     // Step 2: Send real email via Nodemailer (if not a draft)
     if (status !== 'DRAFT') {
       console.log(`[MAIL TOOL] Attempting real Nodemailer delivery to: ${to}`);
-      const smtpConfig = await prisma.emailConfig.findFirst();
-      await sendEmail(to, subject, body, undefined, smtpConfig?.id);
+      await sendEmail(to, subject, body, undefined, undefined);
       console.log('[MAIL TOOL] Success: Email sent successfully');
     }
 

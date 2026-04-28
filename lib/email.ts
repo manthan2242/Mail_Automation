@@ -19,28 +19,41 @@ export const sendEmail = async (
   let port = parseInt(process.env.SMTP_PORT || '587');
   let service: string | undefined = host?.includes('gmail') ? 'gmail' : undefined;
 
+  const isPlaceholder = (u?: string, p?: string) => 
+    !u || !p || u.includes('example.com') || p.includes('your-') || p === 'app-password-here';
+
   // If a specific config ID was provided, use that config from DB
   if (emailConfigId) {
     const config = await prisma.emailConfig.findUnique({
       where: { id: emailConfigId }
     });
-    if (config) {
+    if (config && !isPlaceholder(config.email, config.password)) {
       user = config.email;
       pass = config.password;
       host = config.host;
       port = config.port;
       service = config.host?.includes('gmail') ? 'gmail' : undefined;
     }
-  } else if (!user || user.includes('example.com') || !pass || pass.includes('your-')) {
-    // Env vars are placeholders — fall back to first DB config
-    const defaultConfig = await prisma.emailConfig.findFirst();
-    if (defaultConfig) {
-      console.log(`[SMTP] Using database fallback config: ${defaultConfig.email}`);
-      user = defaultConfig.email;
-      pass = defaultConfig.password;
-      host = defaultConfig.host;
-      port = defaultConfig.port;
-      service = defaultConfig.host?.includes('gmail') ? 'gmail' : undefined;
+  } 
+  
+  // If still using placeholders or no config found, fall back to DB or Env
+  if (isPlaceholder(user, pass)) {
+    const validConfig = await prisma.emailConfig.findFirst({
+      where: {
+        AND: [
+          { password: { not: 'app-password-here' } },
+          { password: { not: { contains: 'placeholder' } } }
+        ]
+      }
+    });
+
+    if (validConfig) {
+      console.log(`[SMTP] Using database fallback config: ${validConfig.email}`);
+      user = validConfig.email;
+      pass = validConfig.password;
+      host = validConfig.host;
+      port = validConfig.port;
+      service = validConfig.host?.includes('gmail') ? 'gmail' : undefined;
     }
   }
 

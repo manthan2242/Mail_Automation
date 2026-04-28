@@ -27,14 +27,12 @@ export async function POST(request: Request) {
       },
     });
 
-    const smtpConfig = await prisma.emailConfig.findFirst();
-
     await sendEmail(
       employee.email,
       'Login OTP - Mail Automation',
       `Your one-time password (OTP) is: ${otpCode}. It will expire in 10 minutes.`,
       undefined,
-      smtpConfig?.id
+      undefined
     );
 
     return NextResponse.json({ success: true, message: 'OTP sent successfully' });
