@@ -24,7 +24,10 @@ export default function EmailConfigsPage() {
   const [configs, setConfigs] = useState<EmailConfig[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAddOpen, setIsAddOpen] = useState(false);
+  const [isEditOpen, setIsEditOpen] = useState(false);
   const [newConfig, setNewConfig] = useState({ host: '', port: '587', email: '', password: '' });
+  const [editingConfig, setEditingConfig] = useState<any>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const { token } = useAuth();
 
   const fetchConfigs = async () => {
@@ -47,6 +50,7 @@ export default function EmailConfigsPage() {
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsSubmitting(true);
     try {
       const res = await fetch('/api/admin/email-configs', {
         method: 'POST',
@@ -67,6 +71,8 @@ export default function EmailConfigsPage() {
       }
     } catch (error) {
       toast.error('Failed to add configuration');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -90,6 +96,33 @@ export default function EmailConfigsPage() {
       }
     } catch (error) {
       toast.error('Network error during deletion');
+    }
+  };
+
+  const handleUpdate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    try {
+      const res = await fetch('/api/admin/email-configs', {
+        method: 'PATCH',
+        headers: { 
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify(editingConfig),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        toast.success('SMTP Configuration updated');
+        setIsEditOpen(false);
+        fetchConfigs();
+      } else {
+        toast.error(data.error);
+      }
+    } catch (error) {
+      toast.error('Failed to update configuration');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -162,8 +195,63 @@ export default function EmailConfigsPage() {
                     required 
                   />
                 </div>
-                <Button type="submit" className="w-full bg-[#6366f1] hover:bg-[#4f46e5] text-white rounded-xl py-6 font-bold shadow-sm shadow-indigo-100">
-                  Save Configuration
+                <Button type="submit" disabled={isSubmitting} className="w-full bg-[#6366f1] hover:bg-[#4f46e5] text-white rounded-xl py-6 font-bold shadow-sm shadow-indigo-100">
+                  {isSubmitting ? 'Saving...' : 'Save Configuration'}
+                </Button>
+              </form>
+            </DialogContent>
+          </Dialog>
+
+          <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+            <DialogContent className="sm:max-w-[450px] bg-white rounded-[24px] border-none shadow-2xl p-0 overflow-hidden">
+              <DialogHeader className="px-8 py-6 bg-[#f8fafc] border-b border-[#e2e8f0]">
+                <DialogTitle className="text-xl font-bold text-[#1e293b]">Edit SMTP Server</DialogTitle>
+              </DialogHeader>
+              <form onSubmit={handleUpdate} className="p-8 space-y-6">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-host" className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider">SMTP Host</Label>
+                  <Input 
+                    id="edit-host" 
+                    value={editingConfig?.host || ''}
+                    onChange={(e) => setEditingConfig({...editingConfig, host: e.target.value})}
+                    className="rounded-xl border-[#e2e8f0] focus:ring-[#6366f1]"
+                    required 
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-port" className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider">Port</Label>
+                  <Input 
+                    id="edit-port" 
+                    type="number"
+                    value={editingConfig?.port || ''}
+                    onChange={(e) => setEditingConfig({...editingConfig, port: e.target.value})}
+                    className="rounded-xl border-[#e2e8f0] focus:ring-[#6366f1]"
+                    required 
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-email" className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider">Email Address</Label>
+                  <Input 
+                    id="edit-email" 
+                    type="email" 
+                    value={editingConfig?.email || ''}
+                    onChange={(e) => setEditingConfig({...editingConfig, email: e.target.value})}
+                    className="rounded-xl border-[#e2e8f0] focus:ring-[#6366f1]"
+                    required 
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-password" className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider">New Password (leave empty to keep same)</Label>
+                  <Input 
+                    id="edit-password" 
+                    type="password" 
+                    placeholder="••••••••••••" 
+                    onChange={(e) => setEditingConfig({...editingConfig, password: e.target.value})}
+                    className="rounded-xl border-[#e2e8f0] focus:ring-[#6366f1]"
+                  />
+                </div>
+                <Button type="submit" disabled={isSubmitting} className="w-full bg-[#6366f1] hover:bg-[#4f46e5] text-white rounded-xl py-6 font-bold shadow-sm shadow-indigo-100">
+                  {isSubmitting ? 'Updating...' : 'Update Configuration'}
                 </Button>
               </form>
             </DialogContent>
@@ -189,14 +277,27 @@ export default function EmailConfigsPage() {
                       <div className="w-8 h-8 md:w-10 md:h-10 rounded-xl bg-[#eef2ff] text-[#6366f1] flex items-center justify-center shadow-sm">
                         <Server className="w-4 h-4 md:w-5 md:h-5" />
                       </div>
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        className="text-[#64748b] hover:text-rose-600 hover:bg-rose-50 rounded-lg md:opacity-0 group-hover:opacity-100 transition-opacity w-8 h-8 md:w-10 md:h-10"
-                        onClick={() => handleDelete(config.id)}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
+                      <div className="flex items-center gap-2">
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="text-[#64748b] hover:text-[#6366f1] hover:bg-blue-50 rounded-lg md:opacity-0 group-hover:opacity-100 transition-opacity w-8 h-8 md:w-10 md:h-10"
+                          onClick={() => {
+                            setEditingConfig({ ...config, password: '' });
+                            setIsEditOpen(true);
+                          }}
+                        >
+                          <Settings className="w-4 h-4" />
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="text-[#64748b] hover:text-rose-600 hover:bg-rose-50 rounded-lg md:opacity-0 group-hover:opacity-100 transition-opacity w-8 h-8 md:w-10 md:h-10"
+                          onClick={() => handleDelete(config.id)}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
                     </div>
                     <CardTitle className="text-sm md:text-lg font-bold text-[#1e293b] mt-3 md:mt-5 truncate">{config.email}</CardTitle>
                   </CardHeader>

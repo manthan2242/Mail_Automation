@@ -229,10 +229,12 @@ export default function ComposeModal({ onClose }: { onClose: () => void }) {
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ 
           to: to.join(','), 
+          cc: cc.join(','),
+          bcc: bcc.join(','),
           subject, 
           body: finalBody,
           fromEmail: selectedIdentity,
-          configId: isAdmin ? configId : undefined
+          configId: configId
         }),
       });
       if (res.ok) {

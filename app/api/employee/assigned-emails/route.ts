@@ -12,24 +12,14 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    const assignments = await prisma.emailAssignment.findMany({
-      where: { employeeId: payload.id },
-      include: {
-        emailAccount: {
-          select: {
-            id: true,
-            email: true
-          }
-        }
+    const configs = await prisma.emailConfig.findMany({
+      select: {
+        id: true,
+        email: true
       }
     });
 
-    const assignedEmails = assignments.map(a => ({
-      id: a.emailAccount.id,
-      email: a.emailAccount.email
-    }));
-
-    return NextResponse.json(assignedEmails);
+    return NextResponse.json(configs);
   } catch (error) {
     console.error('Error fetching assigned emails:', error);
     return NextResponse.json({ error: 'Failed to fetch assigned emails' }, { status: 500 });

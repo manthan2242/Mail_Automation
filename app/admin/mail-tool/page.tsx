@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { EmailAutocomplete } from '@/components/ui/EmailAutocomplete';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { 
   Plus, 
   Search, 
@@ -38,8 +39,15 @@ interface MailHistoryItem {
   createdAt: string;
 }
 
+interface EmailConfig {
+  id: string;
+  email: string;
+}
+
 export default function AdminMailTool() {
   const [history, setHistory] = useState<MailHistoryItem[]>([]);
+  const [configs, setConfigs] = useState<EmailConfig[]>([]);
+  const [selectedConfigId, setSelectedConfigId] = useState<string>('default');
   const [loading, setLoading] = useState(true);
   const [genLoading, setGenLoading] = useState(false);
   const [sendLoading, setSendLoading] = useState(false);
@@ -69,8 +77,23 @@ export default function AdminMailTool() {
     }
   };
 
+  const fetchConfigs = async () => {
+    try {
+      const res = await fetch('/api/admin/email-configs', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      setConfigs(Array.isArray(data) ? data : []);
+    } catch (error) {
+      toast.error('Failed to load SMTP configs');
+    }
+  };
+
   useEffect(() => {
-    if (token) fetchHistory();
+    if (token) {
+      fetchHistory();
+      fetchConfigs();
+    }
   }, [token]);
 
   const handleSearch = async (e?: React.FormEvent) => {
@@ -138,7 +161,11 @@ export default function AdminMailTool() {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`
         },
-        body: JSON.stringify({ ...mailData, status })
+        body: JSON.stringify({ 
+          ...mailData, 
+          status,
+          configId: selectedConfigId === 'default' ? undefined : selectedConfigId 
+        })
       });
       
       if (res.ok) {
@@ -188,15 +215,32 @@ export default function AdminMailTool() {
                 <CardDescription>Draft your email below. Use AI for professional assistance.</CardDescription>
               </CardHeader>
               <CardContent className="p-8 space-y-6">
-                <div className="space-y-2">
-                  <Label htmlFor="to" className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider ml-1">Recipient Address</Label>
-                  <EmailAutocomplete 
-                    id="to"
-                    placeholder="recipient@example.com"
-                    value={mailData.to}
-                    onChange={(e) => setMailData({...mailData, to: e.target.value})}
-                    className="rounded-xl border-[#e2e8f0] h-12 focus:ring-indigo-500/20"
-                  />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <Label className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider ml-1">Send From</Label>
+                    <Select value={selectedConfigId} onValueChange={(val) => setSelectedConfigId(val || 'default')}>
+                      <SelectTrigger className="rounded-xl border-[#e2e8f0] h-12 focus:ring-indigo-500/20">
+                        <SelectValue placeholder="Select Sender" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="default">System Default (via .env)</SelectItem>
+                        {configs.map(config => (
+                          <SelectItem key={config.id} value={config.id}>{config.email}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="to" className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider ml-1">Recipient Address</Label>
+                    <EmailAutocomplete 
+                      id="to"
+                      placeholder="recipient@example.com"
+                      value={mailData.to}
+                      onChange={(e) => setMailData({...mailData, to: e.target.value})}
+                      className="rounded-xl border-[#e2e8f0] h-12 focus:ring-indigo-500/20"
+                    />
+                  </div>
                 </div>
 
                 <div className="space-y-2">

@@ -34,7 +34,7 @@ export async function POST(request: Request) {
     const payload = await verifyToken(token);
     if (!payload) return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
 
-    const { to, subject, body, fromEmail } = await request.json();
+    const { to, cc, bcc, subject, body, fromEmail, configId } = await request.json();
 
     if (!subject || !body) {
       return NextResponse.json({ error: 'Subject and body are required' }, { status: 400 });
@@ -44,10 +44,13 @@ export async function POST(request: Request) {
     const email = await prisma.email.create({
       data: {
         to: to || null,
+        cc: cc || null,
+        bcc: bcc || null,
         fromEmail: fromEmail || null,
         subject,
         body,
         senderId: payload.id,
+        configId: configId || null,
         status: 'PENDING',
       },
     });

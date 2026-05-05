@@ -34,9 +34,18 @@ export async function POST(request: Request) {
     username = username?.trim() || '';
     name = name?.trim() || '';
 
-    // Default password: {username}@123
-    const defaultPassword = `${username}@123`;
-    const hashedPassword = await hashPassword(defaultPassword);
+    // Generate a random password: 10 chars, includes special symbols
+    const generateRandomPassword = (length: number = 10) => {
+      const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*";
+      let password = "";
+      for (let i = 0; i < length; i++) {
+        password += charset.charAt(Math.floor(Math.random() * charset.length));
+      }
+      return password;
+    };
+
+    const randomPassword = generateRandomPassword();
+    const hashedPassword = await hashPassword(randomPassword);
 
     console.log('[API] POST /api/admin/employees - Creating employee:', email);
     const employee = await prisma.employee.create({
@@ -60,7 +69,7 @@ export async function POST(request: Request) {
         `Hello ${name},\n\nYour account has been created successfully.\n\n` +
         `Login Credentials:\n` +
         `Username: ${username}\n` +
-        `Password: ${defaultPassword}\n\n` +
+        `Password: ${randomPassword}\n\n` +
         `Please login and change your password immediately: ${process.env.NEXT_PUBLIC_APP_URL || DEFAULT_APP_URL}/auth/login`,
         undefined,
         smtpConfig?.id

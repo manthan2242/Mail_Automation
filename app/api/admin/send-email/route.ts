@@ -28,22 +28,30 @@ export async function POST(request: Request) {
         to = to || record.to;
         subject = subject || record.subject;
         body = body || record.body;
+        // Also capture cc/bcc from record if available
+        const recordCc = record.cc || undefined;
+        const recordBcc = record.bcc || undefined;
+        
         if (record.employee) {
           employeeToNotify = { email: record.employee.email, name: record.employee.name };
         }
+
+        // Send via Nodemailer with cc/bcc
+        console.log(`[ADMIN MAIL] Attempting delivery to: ${to}`);
+        await sendEmail(to, subject, body, fromEmail, configId, false, recordCc, recordBcc);
+        console.log('[ADMIN MAIL] Success: Email dispatched');
       } else {
         return NextResponse.json({ error: 'Email record not found' }, { status: 404 });
       }
+    } else {
+      // Direct send from admin tool
+      const { cc, bcc } = bodyData;
+      if (!to || !subject || !body) {
+        return NextResponse.json({ error: 'Missing required fields: to, subject, body' }, { status: 400 });
+      }
+      console.log(`[ADMIN MAIL] Direct delivery to: ${to}`);
+      await sendEmail(to, subject, body, fromEmail, configId, false, cc, bcc);
     }
-
-    if (!to || !subject || !body) {
-      return NextResponse.json({ error: 'Missing required fields: to, subject, body' }, { status: 400 });
-    }
-
-    // Step 1: Send real email via Nodemailer
-    console.log(`[ADMIN MAIL] Attempting delivery to: ${to}`);
-    await sendEmail(to, subject, body, fromEmail, configId);
-    console.log('[ADMIN MAIL] Success: Email dispatched');
 
     // Notify employee that their mail has been sent
     if (employeeToNotify) {
@@ -64,11 +72,13 @@ export async function POST(request: Request) {
     // Step 2: Update existing record or save new one
     console.log('[DATABASE] Updating email persistence...');
     let emailRecord;
-    
     if (emailId) {
       emailRecord = await prisma.email.update({
         where: { id: emailId },
-        data: { status: 'SENT' }
+        data: { 
+          status: 'SENT',
+          configId: configId || undefined
+        }
       });
     } else {
       emailRecord = await prisma.email.create({
@@ -78,7 +88,8 @@ export async function POST(request: Request) {
           subject,
           body,
           status: 'SENT',
-          adminSenderId: payload.id
+          adminSenderId: payload.id,
+          configId: configId || undefined
         }
       });
     }

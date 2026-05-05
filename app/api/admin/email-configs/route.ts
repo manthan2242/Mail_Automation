@@ -59,6 +59,37 @@ export async function POST(request: Request) {
   }
 }
 
+export async function PATCH(request: Request) {
+  try {
+    const auth = await validateAdmin(request);
+    if ('error' in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });
+
+    const data = await request.json();
+    const { id, host, port, email, password } = data;
+
+    console.log('[API] PATCH /api/admin/email-configs - Updating config:', id);
+    console.log('[API] Fields to update:', { host, port, email, hasPassword: !!password });
+
+    if (!id) return NextResponse.json({ error: 'ID is required' }, { status: 400 });
+
+    const config = await prisma.emailConfig.update({
+      where: { id },
+      data: {
+        ...(host && { host }),
+        ...(port && { port: parseInt(port.toString()) }),
+        ...(email && { email }),
+        ...(password && { password }),
+      }
+    });
+    console.log('[API] Success: SMTP config updated');
+
+    return NextResponse.json(config);
+  } catch (error) {
+    console.error('[SMTP_UPDATE_ERROR]', error);
+    return NextResponse.json({ error: 'Failed to update SMTP config' }, { status: 500 });
+  }
+}
+
 export async function DELETE(request: Request) {
   try {
     const auth = await validateAdmin(request);

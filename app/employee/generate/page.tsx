@@ -22,7 +22,10 @@ import {
   SelectValue
 } from '@/components/ui/select';
 
-const FROM_EMAILS = (process.env.NEXT_PUBLIC_FROM_EMAILS || '').split(',').filter(Boolean);
+interface EmailConfig {
+  id: string;
+  email: string;
+}
 
 const PROVIDER_LABELS: Record<string, string> = {
   openai:     'OpenAI (GPT-4o Mini)',
@@ -43,7 +46,8 @@ export default function GenerateEmailPage() {
   const [subject, setSubject] = useState('');
   const [body, setBody] = useState('');
   const [recipient, setRecipient] = useState('');
-  const [sourceEmail, setSourceEmail] = useState(FROM_EMAILS[0] || '');
+  const [sourceEmail, setSourceEmail] = useState('');
+  const [configs, setConfigs] = useState<EmailConfig[]>([]);
 
   // AI provider state
   const [activeKeys, setActiveKeys] = useState<AiKey[]>([]);
@@ -57,13 +61,11 @@ export default function GenerateEmailPage() {
   const { token, user } = useAuth();
   const router = useRouter();
 
-  useEffect(() => {
-    if (user?.email) setRecipient(user.email);
-  }, [user]);
-
-  // Load employee's saved provider keys
+  // Load employee's saved provider keys and available SMTP configs
   useEffect(() => {
     if (!token) return;
+    
+    // Fetch AI keys
     fetch('/api/employee/ai-keys', {
       headers: { Authorization: `Bearer ${token}` }
     })
@@ -71,8 +73,22 @@ export default function GenerateEmailPage() {
       .then(data => {
         if (Array.isArray(data)) setActiveKeys(data.filter((k: AiKey) => k.isActive));
       })
-      .catch(() => {})
-      .finally(() => setKeysLoading(false));
+      .catch(() => {});
+      
+    // Fetch available SMTP configs
+    fetch('/api/employee/assigned-emails', {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+      .then(r => r.json())
+      .then(data => {
+        if (Array.isArray(data)) {
+          setConfigs(data);
+          if (data.length > 0) setSourceEmail(data[0].email);
+        }
+      })
+      .catch(() => {});
+
+    setKeysLoading(false);
   }, [token]);
 
   const handleGenerate = async () => {
@@ -120,10 +136,11 @@ export default function GenerateEmailPage() {
     }
     setSending(true);
     try {
+      const configId = configs.find(c => c.email === sourceEmail)?.id;
       const res = await fetch('/api/employee/emails', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ subject, body, to: recipient, fromEmail: sourceEmail }),
+        body: JSON.stringify({ subject, body, to: recipient, fromEmail: sourceEmail, configId }),
       });
       if (res.ok) {
         toast.success('Email submitted to admin for approval');
@@ -163,9 +180,9 @@ export default function GenerateEmailPage() {
                   <SelectContent className="bg-white rounded-xl border-[#e2e8f0] shadow-xl">
                     <SelectGroup>
                       <SelectLabel className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider px-3 py-2">Available Senders</SelectLabel>
-                      {FROM_EMAILS.map(email => (
-                        <SelectItem key={email} value={email} className="rounded-lg mx-1 my-0.5 hover:bg-slate-50">
-                          {email}
+                      {configs.map(config => (
+                        <SelectItem key={config.id} value={config.email} className="rounded-lg mx-1 my-0.5 hover:bg-slate-50">
+                          {config.email}
                         </SelectItem>
                       ))}
                     </SelectGroup>
@@ -174,14 +191,15 @@ export default function GenerateEmailPage() {
               </div>
 
               <div className="space-y-2">
-                <Label className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider">Recipient (Your Email)</Label>
+                <Label className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider">Recipient (Client Email)</Label>
                 <Input
+                  placeholder="client@example.com"
                   value={recipient}
-                  readOnly
-                  disabled
-                  className="rounded-xl border-[#e2e8f0] h-12 bg-[#f8fafc] text-[#1e293b] font-medium cursor-not-allowed"
+                  onChange={e => setRecipient(e.target.value)}
+                  className="rounded-xl border-[#e2e8f0] h-12 bg-white text-[#1e293b] font-medium"
+                  required
                 />
-                <p className="text-[10px] text-[#64748b] font-medium ml-1">📧 Sent only to your registered email.</p>
+                <p className="text-[10px] text-[#64748b] font-medium ml-1">📧 The final destination for this email after approval.</p>
               </div>
             </div>
 

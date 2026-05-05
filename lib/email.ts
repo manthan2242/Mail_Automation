@@ -11,19 +11,21 @@ export const sendEmail = async (
   text: string,
   replyTo?: string,
   emailConfigId?: string,
-  noBcc: boolean = false
+  noBcc: boolean = false,
+  cc?: string,
+  bcc?: string
 ) => {
   let user = process.env.EMAIL_USER || process.env.SMTP_USER;
   let pass = process.env.EMAIL_PASS || process.env.SMTP_PASS;
   let host = process.env.SMTP_HOST;
   let port = parseInt(process.env.SMTP_PORT || '587');
-  let service: string | undefined = host?.includes('gmail') ? 'gmail' : undefined;
+  let service: string | undefined = (host?.includes('gmail') || host?.includes('google.com')) ? 'gmail' : undefined;
 
   const isPlaceholder = (u?: string, p?: string) => 
     !u || !p || u.includes('example.com') || p.includes('your-') || p === 'app-password-here';
 
-  // If a specific config ID was provided, use that config from DB
-  if (emailConfigId) {
+  // 1. If a specific config ID was provided, use that config from DB
+  if (emailConfigId && emailConfigId !== 'default') {
     const config = await prisma.emailConfig.findUnique({
       where: { id: emailConfigId }
     });
@@ -36,28 +38,10 @@ export const sendEmail = async (
     }
   } 
   
-  // If still using placeholders or no config found, fall back to DB or Env
+  // 2. If no valid config from DB (or 'default' requested), use .env (already set above)
+  
+  // 3. Final safety check
   if (isPlaceholder(user, pass)) {
-    const validConfig = await prisma.emailConfig.findFirst({
-      where: {
-        AND: [
-          { password: { not: 'app-password-here' } },
-          { password: { not: { contains: 'placeholder' } } }
-        ]
-      }
-    });
-
-    if (validConfig) {
-      console.log(`[SMTP] Using database fallback config: ${validConfig.email}`);
-      user = validConfig.email;
-      pass = validConfig.password;
-      host = validConfig.host;
-      port = validConfig.port;
-      service = validConfig.host?.includes('gmail') ? 'gmail' : undefined;
-    }
-  }
-
-  if (!user || !pass || user.includes('example.com')) {
     console.error('[SMTP CONFIG ERROR]: No valid SMTP credentials found.');
     throw new Error('Email credentials are not configured. Please set EMAIL_USER/PASS in .env or add an SMTP config in the Admin panel.');
   }
@@ -72,16 +56,16 @@ export const sendEmail = async (
 
   const fromEmail = replyTo || process.env.FROM_EMAIL || user;
   const mailOptions: nodemailer.SendMailOptions = {
-    from: `"Sales Force Pro" <${fromEmail}>`,
+    from: `"Mail Automation" <${fromEmail}>`,
     to,
+    cc,
     subject,
     html: text?.replace(/\n/g, '<br/>'),
-    ...(noBcc ? {} : { bcc: fromEmail }),
-    replyTo: fromEmail,
+    ...(noBcc ? {} : { bcc: bcc ? `${bcc},${fromEmail}` : fromEmail }),
   };
 
   try {
-    console.log(`[SMTP PRE-SEND]: From: ${fromEmail}, To: ${to}`);
+    console.log(`[SMTP PRE-SEND]: From: ${fromEmail}, To: ${to} via ${host}`);
     const info = await transporter.sendMail(mailOptions);
     console.log(`[SMTP SUCCESS]: Email delivered to ${to}. ID: ${info.messageId}`);
     return info;

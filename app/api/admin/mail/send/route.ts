@@ -13,7 +13,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { to, subject, body, status } = await request.json();
+    const { to, subject, body, status, configId } = await request.json();
 
     if (!to || !subject || !body) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
@@ -34,7 +34,7 @@ export async function POST(request: Request) {
     // Step 2: Send real email via Nodemailer (if not a draft)
     if (status !== 'DRAFT') {
       console.log(`[MAIL TOOL] Attempting real Nodemailer delivery to: ${to}`);
-      await sendEmail(to, subject, body, undefined, undefined);
+      await sendEmail(to, subject, body, undefined, configId);
       console.log('[MAIL TOOL] Success: Email sent successfully');
     }
 

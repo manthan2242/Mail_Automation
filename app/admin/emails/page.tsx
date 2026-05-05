@@ -17,17 +17,19 @@ import { useAuth } from '@/hooks/useAuth';
 import { motion } from 'motion/react';
 import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
-const FROM_EMAILS = (process.env.NEXT_PUBLIC_FROM_EMAILS || '').split(',').filter(Boolean);
 
 interface Email {
   id: string;
   subject: string;
   body: string;
   to: string;
+  cc?: string;
+  bcc?: string;
   fromEmail?: string;
   status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'SENT';
   employee?: { name: string; email: string };
   adminComment?: string;
+  configId?: string;
   createdAt: string;
 }
 
@@ -42,7 +44,7 @@ export default function EmailMonitoringPage() {
   const [loading, setLoading] = useState(true);
   const [selectedEmail, setSelectedEmail] = useState<Email | null>(null);
   const [adminComment, setAdminComment] = useState('');
-  const [selectedFromEmail, setSelectedFromEmail] = useState(FROM_EMAILS[0] || '');
+  const [selectedFromEmail, setSelectedFromEmail] = useState('default');
   const [isActionOpen, setIsActionOpen] = useState(false);
   const [isComposeOpen, setIsComposeOpen] = useState(false);
   const [isEditDraftOpen, setIsEditDraftOpen] = useState(false);
@@ -51,6 +53,7 @@ export default function EmailMonitoringPage() {
   const [sendLoading, setSendLoading] = useState(false);
   const [composeData, setComposeData] = useState({ subject: '', body: '', to: '' });
   const [editDraftData, setEditDraftData] = useState({ subject: '', body: '' });
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const { token } = useAuth();
   const router = useRouter();
 
@@ -78,6 +81,7 @@ export default function EmailMonitoringPage() {
   }, [token]);
 
   const handleAction = async (status: 'APPROVED' | 'REJECTED') => {
+    setIsSubmitting(true);
     try {
       const res = await fetch('/api/admin/emails', {
         method: 'PATCH',
@@ -98,11 +102,14 @@ export default function EmailMonitoringPage() {
       }
     } catch (error) {
       toast.error('Failed to update email status');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const handleUpdateDraft = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsSubmitting(true);
     try {
       const res = await fetch('/api/admin/emails', {
         method: 'PATCH',
@@ -125,6 +132,8 @@ export default function EmailMonitoringPage() {
       }
     } catch (error) {
       toast.error('Failed to save changes');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -137,7 +146,11 @@ export default function EmailMonitoringPage() {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`
         },
-        body: JSON.stringify({ emailId, fromEmail: selectedFromEmail }),
+        body: JSON.stringify({ 
+          emailId, 
+          fromEmail: selectedFromEmail === 'default' ? undefined : configs.find(c => c.id === selectedFromEmail)?.email,
+          configId: selectedFromEmail === 'default' ? undefined : selectedFromEmail
+        }),
       });
       const data = await res.json();
       if (res.ok) {
@@ -155,8 +168,8 @@ export default function EmailMonitoringPage() {
   };
 
   const handleGenerateBody = async () => {
-    const sourceEmail = selectedFromEmail;
-    if (!sourceEmail || sourceEmail.trim() === "") {
+    const sourceEmail = selectedFromEmail === 'default' ? 'default' : configs.find(c => c.id === selectedFromEmail)?.email;
+    if (!sourceEmail) {
       toast.error("Please select a 'From' email address");
       return;
     }
@@ -198,6 +211,7 @@ export default function EmailMonitoringPage() {
       toast.error("Please select a 'From' email address");
       return;
     }
+    setIsSubmitting(true);
     try {
       const res = await fetch('/api/employee/send-email', {
         method: 'POST',
@@ -209,7 +223,8 @@ export default function EmailMonitoringPage() {
           recipientEmail: composeData.to,
           subject: composeData.subject,
           body: composeData.body,
-          sourceEmail: sourceEmail
+          sourceEmail: selectedFromEmail === 'default' ? undefined : configs.find(c => c.id === selectedFromEmail)?.email,
+          configId: selectedFromEmail === 'default' ? undefined : selectedFromEmail
         }),
       });
       if (res.ok) {
@@ -223,6 +238,8 @@ export default function EmailMonitoringPage() {
       }
     } catch (error) {
       toast.error('An error occurred');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -314,15 +331,16 @@ export default function EmailMonitoringPage() {
                         <SelectValue placeholder="Select sender email" />
                       </SelectTrigger>
                       <SelectContent className="bg-white rounded-xl">
-                        {FROM_EMAILS.map(email => (
-                          <SelectItem key={email} value={email}>{email}</SelectItem>
+                        <SelectItem value="default">Default SMTP (.env)</SelectItem>
+                        {configs.map(config => (
+                          <SelectItem key={config.id} value={config.id}>{config.email}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </div>
 
-                  <Button type="submit" className="w-full bg-[#6366f1] hover:bg-[#4f46e5] text-white rounded-xl py-6 font-bold shadow-lg shadow-indigo-100">
-                    Send Email
+                  <Button type="submit" disabled={isSubmitting} className="w-full bg-[#6366f1] hover:bg-[#4f46e5] text-white rounded-xl py-6 font-bold shadow-lg shadow-indigo-100">
+                    {isSubmitting ? 'Sending...' : 'Send Email'}
                   </Button>
                 </form>
               </DialogContent>
@@ -360,7 +378,7 @@ export default function EmailMonitoringPage() {
                     if (open) {
                       setSelectedEmail(email);
                       setAdminComment(email.adminComment || '');
-                      setSelectedFromEmail(email.fromEmail || FROM_EMAILS[0] || '');
+                      setSelectedFromEmail(email.configId || 'default');
                     }
                   }}>
                     <DialogTrigger
@@ -382,10 +400,18 @@ export default function EmailMonitoringPage() {
                               <p className="text-sm font-semibold text-[#1e293b]">{email.employee?.name || 'Admin'}</p>
                             </div>
                             <div>
-                              <p className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider">Recipient</p>
-                              <p className="text-sm text-[#64748b]">{email.to}</p>
+                              <p className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider">Recipient (To)</p>
+                              <p className="text-sm text-[#64748b] font-bold">{email.to}</p>
                             </div>
                           </div>
+                          
+                          {email.cc && (
+                            <div>
+                              <p className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider">CC</p>
+                              <p className="text-sm text-[#64748b]">{email.cc}</p>
+                            </div>
+                          )}
+
                           <div className="p-4 bg-[#f8fafc] rounded-xl border border-[#e2e8f0] space-y-3">
                             <div className="flex justify-between items-center">
                               <p className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider">Subject</p>
@@ -423,11 +449,11 @@ export default function EmailMonitoringPage() {
                               />
                             </div>
                             <div className="flex gap-3">
-                              <Button className="flex-1 bg-[#22c55e] hover:bg-[#16a34a] text-white rounded-xl h-12 font-bold" onClick={() => handleAction('APPROVED')}>
-                                Approve
+                              <Button disabled={isSubmitting} className="flex-1 bg-[#22c55e] hover:bg-[#16a34a] text-white rounded-xl h-12 font-bold" onClick={() => handleAction('APPROVED')}>
+                                {isSubmitting ? '...' : 'Approve'}
                               </Button>
-                              <Button variant="outline" className="flex-1 border-rose-200 text-rose-600 rounded-xl h-12 font-bold" onClick={() => handleAction('REJECTED')}>
-                                Reject
+                              <Button disabled={isSubmitting} variant="outline" className="flex-1 border-rose-200 text-rose-600 rounded-xl h-12 font-bold" onClick={() => handleAction('REJECTED')}>
+                                {isSubmitting ? '...' : 'Reject'}
                               </Button>
                             </div>
                           </div>
@@ -499,7 +525,7 @@ export default function EmailMonitoringPage() {
                         if (open) {
                           setSelectedEmail(email);
                           setAdminComment(email.adminComment || '');
-                          setSelectedFromEmail(email.fromEmail || FROM_EMAILS[0] || '');
+                          setSelectedFromEmail(email.configId || 'default');
                         }
                       }}>
                         <DialogTrigger
@@ -515,8 +541,25 @@ export default function EmailMonitoringPage() {
                             <DialogTitle className="text-xl font-bold text-[#1e293b]">Review Email Request</DialogTitle>
                           </DialogHeader>
                            <div className="p-8 space-y-8 max-h-[80vh] overflow-y-auto">
-                            <div className="p-6 bg-[#f8fafc] rounded-[24px] border border-[#e2e8f0] space-y-4 shadow-sm relative group">
-                              <div className="flex justify-between items-start">
+                             <div className="p-6 bg-[#f8fafc] rounded-[24px] border border-[#e2e8f0] space-y-4 shadow-sm relative group">
+                              <div className="grid grid-cols-2 gap-6 mb-4">
+                                <div className="space-y-1">
+                                  <p className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider">From (Suggested)</p>
+                                  <p className="text-sm font-bold text-[#1e293b]">{email.fromEmail || 'Default'}</p>
+                                </div>
+                                <div className="space-y-1">
+                                  <p className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider">To (Recipient)</p>
+                                  <p className="text-sm font-bold text-indigo-600">{email.to}</p>
+                                </div>
+                                {email.cc && (
+                                  <div className="space-y-1 col-span-2">
+                                    <p className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider">CC</p>
+                                    <p className="text-sm text-[#475569]">{email.cc}</p>
+                                  </div>
+                                )}
+                              </div>
+
+                              <div className="flex justify-between items-start border-t border-slate-100 pt-4">
                                 <div className="space-y-1">
                                   <p className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider">Subject</p>
                                   <h3 className="text-lg font-bold text-[#1e293b]">{email.subject}</h3>
@@ -535,7 +578,7 @@ export default function EmailMonitoringPage() {
                               </div>
                               <div className="pt-4 border-t border-slate-200">
                                 <p className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider mb-2">Message Body</p>
-                                <div className="text-sm text-[#334155] whitespace-pre-wrap leading-relaxed bg-white p-4 rounded-xl border border-slate-100 italic">
+                                <div className="text-sm text-[#334155] whitespace-pre-wrap leading-relaxed bg-white p-6 rounded-xl border border-slate-100 italic shadow-inner min-h-[100px]">
                                   {email.body}
                                 </div>
                               </div>
@@ -555,19 +598,21 @@ export default function EmailMonitoringPage() {
  
                                 <div className="flex gap-4 pt-2">
                                   <Button 
+                                    disabled={isSubmitting}
                                     className="flex-1 bg-[#22c55e] hover:bg-[#16a34a] text-white rounded-xl py-6 font-bold shadow-sm shadow-emerald-100"
                                     onClick={() => handleAction('APPROVED')}
                                   >
                                     <CheckCircle className="w-4 h-4 mr-2" />
-                                    Approve Email
+                                    {isSubmitting ? 'Processing...' : 'Approve Email'}
                                   </Button>
                                   <Button 
+                                    disabled={isSubmitting}
                                     variant="outline"
                                     className="flex-1 border-rose-200 text-rose-600 hover:bg-rose-50 rounded-xl py-6 font-bold"
                                     onClick={() => handleAction('REJECTED')}
                                   >
                                     <XCircle className="w-4 h-4 mr-2" />
-                                    Reject
+                                    {isSubmitting ? '...' : 'Reject'}
                                   </Button>
                                 </div>
                               </div>
@@ -584,13 +629,14 @@ export default function EmailMonitoringPage() {
                                   
                                   <div className="text-left space-y-2 mb-6">
                                     <Label className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider">Final Sender Selection</Label>
-                                    <Select onValueChange={(val) => setSelectedFromEmail(val || '')} value={selectedFromEmail}>
+                                    <Select onValueChange={(val) => setSelectedFromEmail(val || 'default')} value={selectedFromEmail}>
                                       <SelectTrigger className="w-full rounded-2xl border-[#e2e8f0] h-12 bg-[#f8fafc] text-[#64748b] font-medium shadow-none focus:ring-[#6366f1] px-4">
                                         <SelectValue placeholder="Select sender email" />
                                       </SelectTrigger>
                                       <SelectContent className="bg-white rounded-xl">
-                                        {FROM_EMAILS.map(email => (
-                                          <SelectItem key={email} value={email}>{email}</SelectItem>
+                                        <SelectItem value="default">Default SMTP (.env)</SelectItem>
+                                        {configs.map(config => (
+                                          <SelectItem key={config.id} value={config.id}>{config.email}</SelectItem>
                                         ))}
                                       </SelectContent>
                                     </Select>
@@ -662,8 +708,8 @@ export default function EmailMonitoringPage() {
               />
             </div>
             <div className="flex gap-4 pt-4">
-              <Button type="submit" className="flex-1 bg-[#6366f1] hover:bg-[#4f46e5] text-white rounded-xl py-7 font-bold">
-                Save Changes
+              <Button type="submit" disabled={isSubmitting} className="flex-1 bg-[#6366f1] hover:bg-[#4f46e5] text-white rounded-xl py-7 font-bold">
+                {isSubmitting ? 'Saving...' : 'Save Changes'}
               </Button>
               <Button type="button" variant="outline" onClick={() => setIsEditDraftOpen(false)} className="px-8 rounded-xl border-slate-200">
                 Cancel

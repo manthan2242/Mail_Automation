@@ -31,6 +31,7 @@ export default function EmployeesPage() {
   const [newEmployee, setNewEmployee] = useState({ email: '', username: '', name: '' });
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
   const [editForm, setEditForm] = useState({ email: '', username: '', name: '' });
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const { token } = useAuth();
   
   const handleSendOTP = async (employeeId: string) => {
@@ -74,6 +75,7 @@ export default function EmployeesPage() {
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsSubmitting(true);
     try {
       const res = await fetch('/api/admin/employees', {
         method: 'POST',
@@ -94,6 +96,8 @@ export default function EmployeesPage() {
       }
     } catch (error) {
       toast.error('Failed to create employee');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -141,7 +145,7 @@ export default function EmployeesPage() {
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingEmployee) return;
-
+    setIsSubmitting(true);
     try {
       const res = await fetch('/api/admin/employees', {
         method: 'PATCH',
@@ -285,12 +289,12 @@ export default function EmployeesPage() {
                   />
                 </div>
                 <div className="p-4 bg-[#f8fafc] rounded-xl border border-[#e2e8f0] text-[11px] text-[#64748b]">
-                  <p className="font-bold text-[#1e293b] mb-1 uppercase tracking-wider">Default Credentials:</p>
-                  <p>Password: {newEmployee.username || '{username}'}@123</p>
+                  <p className="font-bold text-[#1e293b] mb-1 uppercase tracking-wider">Security:</p>
+                  <p>A random password will be automatically generated and sent to the employee's email address upon creation.</p>
                   <p className="mt-1 italic">Employee will be forced to change this on first login.</p>
                 </div>
-                <Button type="submit" className="w-full bg-[#6366f1] hover:bg-[#4f46e5] text-white rounded-xl py-6 font-bold shadow-sm shadow-indigo-100">
-                  Create Employee
+                <Button type="submit" disabled={isSubmitting} className="w-full bg-[#6366f1] hover:bg-[#4f46e5] text-white rounded-xl py-6 font-bold shadow-sm shadow-indigo-100">
+                  {isSubmitting ? 'Creating...' : 'Create Employee'}
                 </Button>
               </form>
             </DialogContent>
@@ -589,8 +593,8 @@ export default function EmployeesPage() {
                 required 
               />
             </div>
-            <Button type="submit" className="w-full bg-[#6366f1] hover:bg-[#4f46e5] text-white rounded-xl py-6 font-bold shadow-sm shadow-indigo-100">
-              Save Changes
+            <Button type="submit" disabled={isSubmitting} className="w-full bg-[#6366f1] hover:bg-[#4f46e5] text-white rounded-xl py-6 font-bold shadow-sm shadow-indigo-100">
+              {isSubmitting ? 'Saving...' : 'Save Changes'}
             </Button>
           </form>
         </DialogContent>

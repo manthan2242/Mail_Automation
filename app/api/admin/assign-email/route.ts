@@ -18,15 +18,29 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Missing employeeId or emailAccountId' }, { status: 400 });
     }
 
-    const assignment = await prisma.emailAssignment.upsert({
+    const existing = await prisma.emailAssignment.findUnique({
       where: {
         employeeId_emailAccountId: {
           employeeId,
           emailAccountId
         }
-      },
-      update: {},
-      create: {
+      }
+    });
+
+    if (existing) {
+      await prisma.emailAssignment.delete({
+        where: {
+          employeeId_emailAccountId: {
+            employeeId,
+            emailAccountId
+          }
+        }
+      });
+      return NextResponse.json({ success: true, message: 'Assignment removed' });
+    }
+
+    const assignment = await prisma.emailAssignment.create({
+      data: {
         employeeId,
         emailAccountId
       }

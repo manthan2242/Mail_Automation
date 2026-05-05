@@ -52,7 +52,6 @@ export default function AdminDashboard() {
     { title: 'Pending Approval', value: stats?.pendingEmails || 0, icon: Clock, color: 'text-amber-500' },
     { title: 'Total Emails Sent', value: stats?.totalEmails || 0, icon: Mail, color: 'text-indigo-500' },
     { title: 'Active Employees', value: stats?.totalEmployees || 0, icon: Users, color: 'text-blue-500' },
-    { title: 'System Status', value: 'Online', icon: CheckCircle, color: 'text-emerald-500' },
   ];
 
   return (
@@ -182,44 +181,7 @@ export default function AdminDashboard() {
             </CardContent>
           </Card>
 
-          {/* System Health Card (Hidden on mobile) */}
-          <Card className="hidden lg:block border border-[#e2e8f0] shadow-[0_2px_8px_rgba(0,0,0,0.04)] bg-white rounded-[24px] overflow-hidden">
-            <CardHeader className="px-8 py-6 border-b border-[#e2e8f0] bg-white">
-              <CardTitle className="text-lg font-bold text-[#1e293b]">System Health</CardTitle>
-            </CardHeader>
-            <CardContent className="p-8 space-y-8">
-              <div className="space-y-3">
-                <div className="flex justify-between text-xs font-bold uppercase tracking-wider text-[#64748b]">
-                  <span>SMTP Delivery Rate</span>
-                  <span className="text-[#1e293b]">98.2%</span>
-                </div>
-                <div className="h-2 bg-[#f1f5f9] rounded-full overflow-hidden">
-                  <div className="h-full bg-[#6366f1] w-[98.2%] rounded-full" />
-                </div>
-              </div>
-              <div className="space-y-3">
-                <div className="flex justify-between text-xs font-bold uppercase tracking-wider text-[#64748b]">
-                  <span>AI Response Accuracy</span>
-                  <span className="text-[#1e293b]">94.5%</span>
-                </div>
-                <div className="h-2 bg-[#f1f5f9] rounded-full overflow-hidden">
-                  <div className="h-full bg-[#6366f1] w-[94.5%] rounded-full" />
-                </div>
-              </div>
-              
-              <div className="pt-4">
-                <div className="p-4 bg-[#f8fafc] rounded-xl border border-[#e2e8f0] flex items-center gap-4">
-                  <div className="w-10 h-10 rounded-lg bg-white border border-[#e2e8f0] flex items-center justify-center shadow-sm">
-                    <Sparkles className="w-5 h-5 text-[#6366f1]" />
-                  </div>
-                  <div>
-                    <p className="text-xs font-bold text-[#1e293b]">AI Engine v2.4</p>
-                    <p className="text-[10px] text-[#64748b] uppercase tracking-wider font-semibold">Running Optimal</p>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+         
         </div>
       </div>
     </DashboardLayout>
