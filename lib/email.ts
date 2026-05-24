@@ -6,15 +6,27 @@ import { prisma } from './db';
  * Resolves credentials from: env vars → database EmailConfig → error.
  */
 export const sendEmail = async (
-  to: string,
+  to: string | string[],
   subject: string,
   text: string,
-  replyTo?: string,
-  emailConfigId?: string,
-  noBcc: boolean = false,
-  cc?: string,
-  bcc?: string
+  options?: {
+    replyTo?: string;
+    cc?: string | string[];
+    bcc?: string | string[];
+    noBcc?: boolean;
+    emailConfigId?: string;
+  },
+  emailConfigId?: string // Keep for backwards compatibility
 ) => {
+  // Handle backwards compatibility
+  const opts = {
+    replyTo: options?.replyTo,
+    cc: options?.cc,
+    bcc: options?.bcc,
+    noBcc: options?.noBcc || false,
+    emailConfigId: options?.emailConfigId || emailConfigId
+  };
+
   let user = process.env.EMAIL_USER || process.env.SMTP_USER;
   let pass = process.env.EMAIL_PASS || process.env.SMTP_PASS;
   let host = process.env.SMTP_HOST;
@@ -25,9 +37,9 @@ export const sendEmail = async (
     !u || !p || u.includes('example.com') || p.includes('your-') || p === 'app-password-here';
 
   // 1. If a specific config ID was provided, use that config from DB
-  if (emailConfigId && emailConfigId !== 'default') {
+  if (opts.emailConfigId && opts.emailConfigId !== 'default') {
     const config = await prisma.emailConfig.findUnique({
-      where: { id: emailConfigId }
+      where: { id: opts.emailConfigId }
     });
     if (config && !isPlaceholder(config.email, config.password)) {
       user = config.email;
@@ -54,20 +66,26 @@ export const sendEmail = async (
     maxMessages: 100
   });
 
-  const fromEmail = replyTo || process.env.FROM_EMAIL || user;
+  const fromEmail = opts.replyTo || process.env.FROM_EMAIL || user;
+  
+  // Convert arrays to comma-separated strings for nodemailer
+  const toStr = Array.isArray(to) ? to.join(', ') : to;
+  const ccStr = Array.isArray(opts.cc) ? opts.cc.join(', ') : opts.cc;
+  const bccStr = Array.isArray(opts.bcc) ? opts.bcc.join(', ') : opts.bcc;
+  
   const mailOptions: nodemailer.SendMailOptions = {
     from: `"Mail Automation" <${fromEmail}>`,
-    to,
-    cc,
+    to: toStr,
+    ...(ccStr && { cc: ccStr }),
     subject,
     html: text?.replace(/\n/g, '<br/>'),
-    ...(noBcc ? {} : { bcc: bcc ? `${bcc},${fromEmail}` : fromEmail }),
+    ...(opts.noBcc ? {} : { bcc: bccStr ? `${bccStr},${fromEmail}` : fromEmail }),
   };
 
   try {
-    console.log(`[SMTP PRE-SEND]: From: ${fromEmail}, To: ${to} via ${host}`);
+    console.log(`[SMTP PRE-SEND]: From: ${fromEmail}, To: ${toStr} via ${host}`);
     const info = await transporter.sendMail(mailOptions);
-    console.log(`[SMTP SUCCESS]: Email delivered to ${to}. ID: ${info.messageId}`);
+    console.log(`[SMTP SUCCESS]: Email delivered to ${toStr}. ID: ${info.messageId}`);
     return info;
   } catch (error: any) {
     console.error(`[SMTP FATAL ERROR]:`, {

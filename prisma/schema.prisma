@@ -126,6 +126,8 @@ model Contact {
 model AdminMailHistory {
   id        String   @id @default(uuid())
   to        String
+  cc        String?
+  bcc       String?
   subject   String
   body      String
   status    String   @default("SENT")

@@ -33,6 +33,8 @@ import { format } from 'date-fns';
 interface MailHistoryItem {
   id: string;
   to: string;
+  cc?: string;
+  bcc?: string;
   subject: string;
   body: string;
   status: string;
@@ -43,6 +45,44 @@ interface EmailConfig {
   id: string;
   email: string;
 }
+
+// Helper function to parse comma-separated emails
+const parseEmails = (emailString: string): string[] => {
+  return emailString
+    .split(',')
+    .map(email => email.trim())
+    .filter(email => email.length > 0);
+};
+
+// Helper function to validate email format
+const isValidEmail = (email: string): boolean => {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email);
+};
+
+// Helper function to validate multiple emails
+const validateEmails = (emailString: string): { valid: boolean; message: string } => {
+  if (!emailString.trim()) {
+    return { valid: false, message: 'Email field is required' };
+  }
+  
+  const emails = parseEmails(emailString);
+  
+  if (emails.length === 0) {
+    return { valid: false, message: 'Please enter at least one email address' };
+  }
+  
+  const invalidEmails = emails.filter(email => !isValidEmail(email));
+  
+  if (invalidEmails.length > 0) {
+    return { 
+      valid: false, 
+      message: `Invalid email format: ${invalidEmails.join(', ')}. Use comma to separate multiple emails.` 
+    };
+  }
+  
+  return { valid: true, message: '' };
+};
 
 export default function AdminMailTool() {
   const [history, setHistory] = useState<MailHistoryItem[]>([]);
@@ -57,6 +97,8 @@ export default function AdminMailTool() {
   
   const [mailData, setMailData] = useState({
     to: '',
+    cc: '',
+    bcc: '',
     subject: '',
     body: ''
   });
@@ -146,8 +188,33 @@ export default function AdminMailTool() {
   };
 
   const handleProcessMail = async (status: 'SENT' | 'DRAFT') => {
-    if (!mailData.to || !mailData.subject || !mailData.body) {
-      toast.error('Please fill in all fields');
+    // Validate TO field (required)
+    const toValidation = validateEmails(mailData.to);
+    if (!toValidation.valid) {
+      toast.error(toValidation.message);
+      return;
+    }
+
+    // Validate CC field (optional but if provided, must be valid)
+    if (mailData.cc.trim()) {
+      const ccValidation = validateEmails(mailData.cc);
+      if (!ccValidation.valid) {
+        toast.error(`CC: ${ccValidation.message}`);
+        return;
+      }
+    }
+
+    // Validate BCC field (optional but if provided, must be valid)
+    if (mailData.bcc.trim()) {
+      const bccValidation = validateEmails(mailData.bcc);
+      if (!bccValidation.valid) {
+        toast.error(`BCC: ${bccValidation.message}`);
+        return;
+      }
+    }
+
+    if (!mailData.subject || !mailData.body) {
+      toast.error('Please fill in subject and message content');
       return;
     }
 
@@ -162,7 +229,11 @@ export default function AdminMailTool() {
           Authorization: `Bearer ${token}`
         },
         body: JSON.stringify({ 
-          ...mailData, 
+          to: parseEmails(mailData.to),
+          cc: mailData.cc.trim() ? parseEmails(mailData.cc) : [],
+          bcc: mailData.bcc.trim() ? parseEmails(mailData.bcc) : [],
+          subject: mailData.subject,
+          body: mailData.body,
           status,
           configId: selectedConfigId === 'default' ? undefined : selectedConfigId 
         })
@@ -170,7 +241,7 @@ export default function AdminMailTool() {
       
       if (res.ok) {
         toast.success(status === 'SENT' ? 'Email sent successfully!' : 'Draft saved!');
-        setMailData({ to: '', subject: '', body: '' });
+        setMailData({ to: '', cc: '', bcc: '', subject: '', body: '' });
         fetchHistory();
       } else {
         const data = await res.json();
@@ -187,6 +258,8 @@ export default function AdminMailTool() {
   const reuseTemplate = (item: MailHistoryItem) => {
     setMailData({
       to: item.to,
+      cc: '',
+      bcc: '',
       subject: item.subject,
       body: item.body
     });
@@ -232,14 +305,41 @@ export default function AdminMailTool() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="to" className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider ml-1">Recipient Address</Label>
+                    <Label htmlFor="to" className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider ml-1">Recipient Address (TO) *</Label>
                     <EmailAutocomplete 
                       id="to"
-                      placeholder="recipient@example.com"
+                      placeholder="recipient@example.com, another@example.com"
                       value={mailData.to}
                       onChange={(e) => setMailData({...mailData, to: e.target.value})}
                       className="rounded-xl border-[#e2e8f0] h-12 focus:ring-indigo-500/20"
                     />
+                    <p className="text-[9px] text-slate-400 mt-1">Separate multiple emails with commas</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <Label htmlFor="cc" className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider ml-1">CC (Optional)</Label>
+                    <Input 
+                      id="cc"
+                      placeholder="cc@example.com, another@example.com"
+                      value={mailData.cc}
+                      onChange={(e) => setMailData({...mailData, cc: e.target.value})}
+                      className="rounded-xl border-[#e2e8f0] h-12 focus:ring-indigo-500/20"
+                    />
+                    <p className="text-[9px] text-slate-400 mt-1">Separate multiple emails with commas</p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="bcc" className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider ml-1">BCC (Optional)</Label>
+                    <Input 
+                      id="bcc"
+                      placeholder="bcc@example.com, another@example.com"
+                      value={mailData.bcc}
+                      onChange={(e) => setMailData({...mailData, bcc: e.target.value})}
+                      className="rounded-xl border-[#e2e8f0] h-12 focus:ring-indigo-500/20"
+                    />
+                    <p className="text-[9px] text-slate-400 mt-1">Separate multiple emails with commas</p>
                   </div>
                 </div>
 
@@ -281,7 +381,7 @@ export default function AdminMailTool() {
                     variant="ghost"
                     size="sm"
                     className="text-[#64748b] hover:text-[#1e293b]"
-                    onClick={() => setMailData({ to: '', subject: '', body: '' })}
+                    onClick={() => setMailData({ to: '', cc: '', bcc: '', subject: '', body: '' })}
                   >
                     Clear All
                   </Button>
@@ -416,10 +516,34 @@ export default function AdminMailTool() {
                 {selectedMail?.to[0].toUpperCase()}
               </div>
               <div>
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Recipient</p>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">To</p>
                 <p className="text-sm font-bold text-slate-700">{selectedMail?.to}</p>
               </div>
             </div>
+
+            {selectedMail?.cc && selectedMail.cc.trim() && (
+              <div className="flex items-start gap-2 p-3 bg-slate-50/80 rounded-2xl border border-slate-100">
+                <div className="w-8 h-8 rounded-full bg-white border border-slate-200 flex items-center justify-center text-blue-600 text-xs font-bold flex-shrink-0">
+                  CC
+                </div>
+                <div className="flex-1">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">CC</p>
+                  <p className="text-sm font-bold text-slate-700 break-words">{selectedMail.cc}</p>
+                </div>
+              </div>
+            )}
+
+            {selectedMail?.bcc && selectedMail.bcc.trim() && (
+              <div className="flex items-start gap-2 p-3 bg-slate-50/80 rounded-2xl border border-slate-100">
+                <div className="w-8 h-8 rounded-full bg-white border border-slate-200 flex items-center justify-center text-purple-600 text-xs font-bold flex-shrink-0">
+                  BCC
+                </div>
+                <div className="flex-1">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">BCC</p>
+                  <p className="text-sm font-bold text-slate-700 break-words">{selectedMail.bcc}</p>
+                </div>
+              </div>
+            )}
 
             <div className="bg-white rounded-2xl border border-slate-100 p-6 whitespace-pre-wrap text-[#334155] text-sm leading-relaxed shadow-sm">
                 {selectedMail?.body}

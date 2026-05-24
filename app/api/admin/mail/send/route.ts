@@ -13,17 +13,30 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { to, subject, body, status, configId } = await request.json();
+    const { to, cc, bcc, subject, body, status, configId } = await request.json();
 
-    if (!to || !subject || !body) {
-      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+    // Validate TO field
+    if (!to || !Array.isArray(to) || to.length === 0 || !subject || !body) {
+      return NextResponse.json({ error: 'Missing or invalid required fields. TO must be an array with at least one email.' }, { status: 400 });
+    }
+
+    // Validate CC field (optional but if provided, must be array)
+    if (cc && !Array.isArray(cc)) {
+      return NextResponse.json({ error: 'CC must be an array' }, { status: 400 });
+    }
+
+    // Validate BCC field (optional but if provided, must be array)
+    if (bcc && !Array.isArray(bcc)) {
+      return NextResponse.json({ error: 'BCC must be an array' }, { status: 400 });
     }
 
     // Step 1: Save to history (PostgreSQL)
     console.log('[MAIL TOOL] Saving mail record to AdminMailHistory...');
     const historyItem = await prisma.adminMailHistory.create({
       data: {
-        to,
+        to: to.join(', '),
+        cc: cc && cc.length > 0 ? cc.join(', ') : null,
+        bcc: bcc && bcc.length > 0 ? bcc.join(', ') : null,
         subject,
         body,
         status: status || 'SENT'
@@ -33,8 +46,8 @@ export async function POST(request: Request) {
 
     // Step 2: Send real email via Nodemailer (if not a draft)
     if (status !== 'DRAFT') {
-      console.log(`[MAIL TOOL] Attempting real Nodemailer delivery to: ${to}`);
-      await sendEmail(to, subject, body, undefined, configId);
+      console.log(`[MAIL TOOL] Attempting real Nodemailer delivery to: ${to.join(', ')}`);
+      await sendEmail(to, subject, body, { cc: cc || [], bcc: bcc || [] }, configId);
       console.log('[MAIL TOOL] Success: Email sent successfully');
     }
 
