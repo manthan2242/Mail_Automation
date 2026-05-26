@@ -69,7 +69,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const items = user?.role === 'admin' ? adminItems : employeeItems;
 
   return (
-    <div className="min-h-screen bg-[#f8fafc] flex">
+    <div className="h-screen overflow-hidden bg-[#f8fafc] flex">
       {/* Desktop Sidebar */}
       <aside className="hidden lg:flex flex-col w-[240px] bg-white border-r border-[#e2e8f0] py-6 space-y-8">
         <div className="px-6 mb-2">

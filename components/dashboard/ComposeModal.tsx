@@ -273,7 +273,7 @@ export default function ComposeModal({ onClose }: { onClose: () => void }) {
   };
 
   return (
-    <div className="fixed inset-0 sm:inset-x-auto sm:inset-y-auto sm:bottom-0 sm:right-16 w-full sm:w-[600px] sm:h-[650px] z-[100] bg-white sm:rounded-t-xl shadow-2xl flex flex-col overflow-hidden border border-gray-200">
+    <div className="fixed inset-0 sm:inset-x-auto sm:inset-y-auto sm:bottom-0 sm:right-16 w-full sm:w-[600px] sm:h-[650px] sm:max-h-[calc(100vh-24px)] z-[100] bg-white sm:rounded-t-xl shadow-2xl flex flex-col overflow-hidden border border-gray-200">
       {/* Header - always pinned to top, X always visible */}
       <div className="bg-[#f2f6fc] px-4 py-3 flex justify-between items-center text-sm border-b border-gray-200 shrink-0">
         <span className="font-semibold text-gray-800">New Message</span>
@@ -321,12 +321,33 @@ export default function ComposeModal({ onClose }: { onClose: () => void }) {
 
         {/* CC & BCC Fields */}
         {showCc && (
-           <div className="relative border-b border-gray-100 px-4 py-2 flex flex-wrap items-center">
-            <span className="text-gray-500 text-sm font-medium w-8">Cc</span>
-            <div className="flex flex-1 flex-wrap items-center">
+           <div className="relative border-b border-gray-100 px-4 py-2 flex flex-wrap items-center min-h-[46px]">
+            <span className="text-gray-500 text-sm font-medium w-8 shrink-0">Cc</span>
+            <div className="flex flex-1 flex-wrap items-center overflow-hidden">
               {renderChips('cc', cc)}
-              <input type="text" className="flex-1 min-w-[100px] outline-none text-sm py-1 font-medium" value={ccInput} onChange={(e) => handleInputChange('cc', e.target.value)} onFocus={() => setActiveField('cc')} />
+              <input 
+                type="text" 
+                className="flex-1 min-w-[100px] outline-none text-sm sm:text-base py-1 font-medium text-gray-800 bg-transparent" 
+                value={ccInput} 
+                onChange={(e) => handleInputChange('cc', e.target.value)} 
+                onKeyDown={(e) => handleKeyDown(e, 'cc')}
+                onFocus={() => setActiveField('cc')} 
+              />
             </div>
+            
+            {activeField === 'cc' && (suggestions.length > 0 || isLoadingSuggestions) && (
+              <div className="absolute top-full left-0 w-full max-h-[250px] overflow-y-auto bg-white border border-gray-200 shadow-2xl rounded-b-lg z-[110] py-1">
+                {suggestions.map((c, i) => (
+                  <div key={i} className={`px-4 py-2 cursor-pointer flex items-center gap-3 ${highlightedIndex === i ? 'bg-blue-50' : 'hover:bg-gray-50'}`} onMouseDown={() => addRecipient('cc', c.email)}>
+                    <div className="w-7 h-7 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-[10px] shrink-0">{c.name.charAt(0)}</div>
+                    <div className="flex flex-col min-w-0">
+                      <span className="text-xs sm:text-sm font-semibold truncate">{c.name}</span>
+                      <span className="text-[10px] sm:text-xs text-gray-500 truncate">{c.email}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
            </div>
         )}
         {showBcc && (

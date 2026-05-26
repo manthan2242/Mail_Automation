@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -21,7 +21,8 @@ import {
   Clock, 
   Search as SearchIcon,
   RefreshCw,
-  FileText
+  FileText,
+  X
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { toast } from 'sonner';
@@ -104,6 +105,102 @@ export default function AdminMailTool() {
   });
 
   const { token } = useAuth();
+
+  const [toEmails, setToEmails] = useState<string[]>([]);
+  const [ccEmails, setCcEmails] = useState<string[]>([]);
+  const [bccEmails, setBccEmails] = useState<string[]>([]);
+  
+  const [toInput, setToInput] = useState('');
+  const [ccInput, setCcInput] = useState('');
+  const [bccInput, setBccInput] = useState('');
+  
+  const [suggestions, setSuggestions] = useState<{ name: string; email: string }[]>([]);
+  const [activeField, setActiveField] = useState<'to' | 'cc' | 'bcc' | null>(null);
+  const [highlightedIndex, setHighlightedIndex] = useState(-1);
+  const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
+  const debounceTimer = useRef<NodeJS.Timeout|null>(null);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
+        setActiveField(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const fetchSuggestions = async (query: string) => {
+    if (!query.trim() || !token) {
+      setSuggestions([]);
+      return;
+    }
+    setIsLoadingSuggestions(true);
+    try {
+      const res = await fetch(`/api/email-suggestions?query=${encodeURIComponent(query)}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        setSuggestions(data);
+        setHighlightedIndex(data.length > 0 ? 0 : -1);
+      }
+    } catch (err) {
+      console.error('Suggestions fetch error:', err);
+    } finally {
+      setIsLoadingSuggestions(false);
+    }
+  };
+
+  const handleInputChange = (field: 'to' | 'cc' | 'bcc', val: string) => {
+    if (field === 'to') setToInput(val);
+    if (field === 'cc') setCcInput(val);
+    if (field === 'bcc') setBccInput(val);
+    setActiveField(field);
+    if (debounceTimer.current) clearTimeout(debounceTimer.current);
+    debounceTimer.current = setTimeout(() => fetchSuggestions(val), 300);
+  };
+
+  const addRecipient = (field: 'to' | 'cc' | 'bcc', email: string) => {
+    if (!email.trim() || !email.includes('@')) return;
+    if (field === 'to' && !toEmails.includes(email)) setToEmails([...toEmails, email]);
+    if (field === 'cc' && !ccEmails.includes(email)) setCcEmails([...ccEmails, email]);
+    if (field === 'bcc' && !bccEmails.includes(email)) setBccEmails([...bccEmails, email]);
+    if (field === 'to') setToInput('');
+    if (field === 'cc') setCcInput('');
+    if (field === 'bcc') setBccInput('');
+    setActiveField(null);
+    setSuggestions([]);
+    setHighlightedIndex(-1);
+  };
+
+  const removeRecipient = (field: 'to' | 'cc' | 'bcc', email: string) => {
+    if (field === 'to') setToEmails(toEmails.filter(e => e !== email));
+    if (field === 'cc') setCcEmails(ccEmails.filter(e => e !== email));
+    if (field === 'bcc') setBccEmails(bccEmails.filter(e => e !== email));
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent, field: 'to' | 'cc' | 'bcc') => {
+    const currentInput = field === 'to' ? toInput : field === 'cc' ? ccInput : bccInput;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setHighlightedIndex(prev => (prev < suggestions.length - 1 ? prev + 1 : prev));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setHighlightedIndex(prev => (prev > 0 ? prev - 1 : prev));
+    } else if (e.key === 'Enter') {
+      if (highlightedIndex >= 0 && suggestions[highlightedIndex]) {
+        e.preventDefault();
+        addRecipient(field, suggestions[highlightedIndex].email);
+      } else if (currentInput.includes('@')) {
+        e.preventDefault();
+        addRecipient(field, currentInput);
+      }
+    } else if (e.key === 'Escape') {
+      setActiveField(null);
+    }
+  };
 
   const fetchHistory = async () => {
     try {
@@ -189,28 +286,9 @@ export default function AdminMailTool() {
 
   const handleProcessMail = async (status: 'SENT' | 'DRAFT') => {
     // Validate TO field (required)
-    const toValidation = validateEmails(mailData.to);
-    if (!toValidation.valid) {
-      toast.error(toValidation.message);
+    if (toEmails.length === 0) {
+      toast.error('Please enter at least one recipient (TO)');
       return;
-    }
-
-    // Validate CC field (optional but if provided, must be valid)
-    if (mailData.cc.trim()) {
-      const ccValidation = validateEmails(mailData.cc);
-      if (!ccValidation.valid) {
-        toast.error(`CC: ${ccValidation.message}`);
-        return;
-      }
-    }
-
-    // Validate BCC field (optional but if provided, must be valid)
-    if (mailData.bcc.trim()) {
-      const bccValidation = validateEmails(mailData.bcc);
-      if (!bccValidation.valid) {
-        toast.error(`BCC: ${bccValidation.message}`);
-        return;
-      }
     }
 
     if (!mailData.subject || !mailData.body) {
@@ -229,9 +307,9 @@ export default function AdminMailTool() {
           Authorization: `Bearer ${token}`
         },
         body: JSON.stringify({ 
-          to: parseEmails(mailData.to),
-          cc: mailData.cc.trim() ? parseEmails(mailData.cc) : [],
-          bcc: mailData.bcc.trim() ? parseEmails(mailData.bcc) : [],
+          to: toEmails,
+          cc: ccEmails,
+          bcc: bccEmails,
           subject: mailData.subject,
           body: mailData.body,
           status,
@@ -241,6 +319,12 @@ export default function AdminMailTool() {
       
       if (res.ok) {
         toast.success(status === 'SENT' ? 'Email sent successfully!' : 'Draft saved!');
+        setToEmails([]);
+        setCcEmails([]);
+        setBccEmails([]);
+        setToInput('');
+        setCcInput('');
+        setBccInput('');
         setMailData({ to: '', cc: '', bcc: '', subject: '', body: '' });
         fetchHistory();
       } else {
@@ -256,8 +340,11 @@ export default function AdminMailTool() {
   };
 
   const reuseTemplate = (item: MailHistoryItem) => {
+    setToEmails(parseEmails(item.to));
+    setCcEmails(item.cc ? parseEmails(item.cc) : []);
+    setBccEmails(item.bcc ? parseEmails(item.bcc) : []);
     setMailData({
-      to: item.to,
+      to: '',
       cc: '',
       bcc: '',
       subject: item.subject,
@@ -287,7 +374,7 @@ export default function AdminMailTool() {
                 </CardTitle>
                 <CardDescription>Draft your email below. Use AI for professional assistance.</CardDescription>
               </CardHeader>
-              <CardContent className="p-8 space-y-6">
+              <CardContent className="p-8 space-y-6" ref={wrapperRef}>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
                     <Label className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider ml-1">Send From</Label>
@@ -304,42 +391,120 @@ export default function AdminMailTool() {
                     </Select>
                   </div>
 
-                  <div className="space-y-2">
+                  <div className="space-y-2 relative">
                     <Label htmlFor="to" className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider ml-1">Recipient Address (TO) *</Label>
-                    <EmailAutocomplete 
-                      id="to"
-                      placeholder="recipient@example.com, another@example.com"
-                      value={mailData.to}
-                      onChange={(e) => setMailData({...mailData, to: e.target.value})}
-                      className="rounded-xl border-[#e2e8f0] h-12 focus:ring-indigo-500/20"
-                    />
-                    <p className="text-[9px] text-slate-400 mt-1">Separate multiple emails with commas</p>
+                    <div className="flex flex-wrap items-center gap-1.5 p-2 min-h-12 border border-[#e2e8f0] rounded-xl focus-within:ring-2 focus-within:ring-indigo-500/20 focus-within:border-indigo-500 transition-all bg-white">
+                      {toEmails.map((email, idx) => (
+                        <div key={idx} className="flex items-center bg-[#f1f5f9] rounded-lg px-2.5 py-1 text-xs border border-[#e2e8f0] max-w-[200px] shrink-0">
+                          <span className="text-[#334155] font-semibold truncate mr-1.5">{email}</span>
+                          <X className="w-3.5 h-3.5 text-[#94a3b8] hover:text-[#ef4444] cursor-pointer shrink-0" onClick={() => removeRecipient('to', email)} />
+                        </div>
+                      ))}
+                      <input 
+                        type="text" 
+                        id="to"
+                        placeholder={toEmails.length === 0 ? "recipient@example.com" : ""} 
+                        className="flex-1 min-w-[120px] outline-none border-none text-sm py-1 px-1 text-[#1e293b] font-medium bg-transparent" 
+                        value={toInput}
+                        onChange={(e) => handleInputChange('to', e.target.value)}
+                        onKeyDown={(e) => handleKeyDown(e, 'to')}
+                        onFocus={() => setActiveField('to')}
+                        autoComplete="off"
+                      />
+                    </div>
+                    <p className="text-[9px] text-slate-400 mt-1">Press Enter or select a suggestion to add. Click "X" to remove.</p>
+
+                    {activeField === 'to' && (suggestions.length > 0 || isLoadingSuggestions) && (
+                      <div className="absolute top-full left-0 w-full mt-1.5 max-h-[200px] overflow-y-auto bg-white border border-[#e2e8f0] shadow-xl rounded-xl z-[100] py-1">
+                        {suggestions.map((c, i) => (
+                          <div key={i} className={`px-4 py-2.5 cursor-pointer flex items-center gap-3 ${highlightedIndex === i ? 'bg-indigo-50/70 text-indigo-700' : 'hover:bg-slate-50'}`} onMouseDown={() => addRecipient('to', c.email)}>
+                            <div className="w-7 h-7 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-xs shrink-0">{c.name.charAt(0)}</div>
+                            <div className="flex flex-col min-w-0">
+                              <span className="text-xs font-bold text-[#1e293b] truncate">{c.name}</span>
+                              <span className="text-[10px] text-slate-400 truncate">{c.email}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
+                  <div className="space-y-2 relative">
                     <Label htmlFor="cc" className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider ml-1">CC (Optional)</Label>
-                    <Input 
-                      id="cc"
-                      placeholder="cc@example.com, another@example.com"
-                      value={mailData.cc}
-                      onChange={(e) => setMailData({...mailData, cc: e.target.value})}
-                      className="rounded-xl border-[#e2e8f0] h-12 focus:ring-indigo-500/20"
-                    />
-                    <p className="text-[9px] text-slate-400 mt-1">Separate multiple emails with commas</p>
+                    <div className="flex flex-wrap items-center gap-1.5 p-2 min-h-12 border border-[#e2e8f0] rounded-xl focus-within:ring-2 focus-within:ring-indigo-500/20 focus-within:border-indigo-500 transition-all bg-white">
+                      {ccEmails.map((email, idx) => (
+                        <div key={idx} className="flex items-center bg-[#f1f5f9] rounded-lg px-2.5 py-1 text-xs border border-[#e2e8f0] max-w-[200px] shrink-0">
+                          <span className="text-[#334155] font-semibold truncate mr-1.5">{email}</span>
+                          <X className="w-3.5 h-3.5 text-[#94a3b8] hover:text-[#ef4444] cursor-pointer shrink-0" onClick={() => removeRecipient('cc', email)} />
+                        </div>
+                      ))}
+                      <input 
+                        type="text" 
+                        id="cc"
+                        placeholder={ccEmails.length === 0 ? "cc@example.com" : ""} 
+                        className="flex-1 min-w-[120px] outline-none border-none text-sm py-1 px-1 text-[#1e293b] font-medium bg-transparent" 
+                        value={ccInput}
+                        onChange={(e) => handleInputChange('cc', e.target.value)}
+                        onKeyDown={(e) => handleKeyDown(e, 'cc')}
+                        onFocus={() => setActiveField('cc')}
+                        autoComplete="off"
+                      />
+                    </div>
+                    <p className="text-[9px] text-slate-400 mt-1">Press Enter or select a suggestion to add.</p>
+
+                    {activeField === 'cc' && (suggestions.length > 0 || isLoadingSuggestions) && (
+                      <div className="absolute top-full left-0 w-full mt-1.5 max-h-[200px] overflow-y-auto bg-white border border-[#e2e8f0] shadow-xl rounded-xl z-[100] py-1">
+                        {suggestions.map((c, i) => (
+                          <div key={i} className={`px-4 py-2.5 cursor-pointer flex items-center gap-3 ${highlightedIndex === i ? 'bg-indigo-50/70 text-indigo-700' : 'hover:bg-slate-50'}`} onMouseDown={() => addRecipient('cc', c.email)}>
+                            <div className="w-7 h-7 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-xs shrink-0">{c.name.charAt(0)}</div>
+                            <div className="flex flex-col min-w-0">
+                              <span className="text-xs font-bold text-[#1e293b] truncate">{c.name}</span>
+                              <span className="text-[10px] text-slate-400 truncate">{c.email}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
-                  <div className="space-y-2">
+                  <div className="space-y-2 relative">
                     <Label htmlFor="bcc" className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider ml-1">BCC (Optional)</Label>
-                    <Input 
-                      id="bcc"
-                      placeholder="bcc@example.com, another@example.com"
-                      value={mailData.bcc}
-                      onChange={(e) => setMailData({...mailData, bcc: e.target.value})}
-                      className="rounded-xl border-[#e2e8f0] h-12 focus:ring-indigo-500/20"
-                    />
-                    <p className="text-[9px] text-slate-400 mt-1">Separate multiple emails with commas</p>
+                    <div className="flex flex-wrap items-center gap-1.5 p-2 min-h-12 border border-[#e2e8f0] rounded-xl focus-within:ring-2 focus-within:ring-indigo-500/20 focus-within:border-indigo-500 transition-all bg-white">
+                      {bccEmails.map((email, idx) => (
+                        <div key={idx} className="flex items-center bg-[#f1f5f9] rounded-lg px-2.5 py-1 text-xs border border-[#e2e8f0] max-w-[200px] shrink-0">
+                          <span className="text-[#334155] font-semibold truncate mr-1.5">{email}</span>
+                          <X className="w-3.5 h-3.5 text-[#94a3b8] hover:text-[#ef4444] cursor-pointer shrink-0" onClick={() => removeRecipient('bcc', email)} />
+                        </div>
+                      ))}
+                      <input 
+                        type="text" 
+                        id="bcc"
+                        placeholder={bccEmails.length === 0 ? "bcc@example.com" : ""} 
+                        className="flex-1 min-w-[120px] outline-none border-none text-sm py-1 px-1 text-[#1e293b] font-medium bg-transparent" 
+                        value={bccInput}
+                        onChange={(e) => handleInputChange('bcc', e.target.value)}
+                        onKeyDown={(e) => handleKeyDown(e, 'bcc')}
+                        onFocus={() => setActiveField('bcc')}
+                        autoComplete="off"
+                      />
+                    </div>
+                    <p className="text-[9px] text-slate-400 mt-1">Press Enter or select a suggestion to add.</p>
+
+                    {activeField === 'bcc' && (suggestions.length > 0 || isLoadingSuggestions) && (
+                      <div className="absolute top-full left-0 w-full mt-1.5 max-h-[200px] overflow-y-auto bg-white border border-[#e2e8f0] shadow-xl rounded-xl z-[100] py-1">
+                        {suggestions.map((c, i) => (
+                          <div key={i} className={`px-4 py-2.5 cursor-pointer flex items-center gap-3 ${highlightedIndex === i ? 'bg-indigo-50/70 text-indigo-700' : 'hover:bg-slate-50'}`} onMouseDown={() => addRecipient('bcc', c.email)}>
+                            <div className="w-7 h-7 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-xs shrink-0">{c.name.charAt(0)}</div>
+                            <div className="flex flex-col min-w-0">
+                              <span className="text-xs font-bold text-[#1e293b] truncate">{c.name}</span>
+                              <span className="text-[10px] text-slate-400 truncate">{c.email}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -381,7 +546,15 @@ export default function AdminMailTool() {
                     variant="ghost"
                     size="sm"
                     className="text-[#64748b] hover:text-[#1e293b]"
-                    onClick={() => setMailData({ to: '', cc: '', bcc: '', subject: '', body: '' })}
+                    onClick={() => {
+                      setToEmails([]);
+                      setCcEmails([]);
+                      setBccEmails([]);
+                      setToInput('');
+                      setCcInput('');
+                      setBccInput('');
+                      setMailData({ to: '', cc: '', bcc: '', subject: '', body: '' });
+                    }}
                   >
                     Clear All
                   </Button>

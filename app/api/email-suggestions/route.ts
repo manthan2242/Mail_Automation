@@ -21,8 +21,8 @@ export async function GET(request: Request) {
     const employees = await prisma.employee.findMany({
       where: {
         OR: [
-          { name: { contains: query, mode: 'insensitive' } },
-          { email: { contains: query, mode: 'insensitive' } },
+          { name: { contains: query } },
+          { email: { contains: query } },
         ],
       },
       select: { email: true, name: true },
@@ -33,8 +33,8 @@ export async function GET(request: Request) {
     const admins = await prisma.admin.findMany({
       where: {
         OR: [
-          { name: { contains: query, mode: 'insensitive' } },
-          { email: { contains: query, mode: 'insensitive' } },
+          { name: { contains: query } },
+          { email: { contains: query } },
         ],
       },
       select: { email: true, name: true },
@@ -48,8 +48,8 @@ export async function GET(request: Request) {
       contacts = await prisma.contact.findMany({
         where: {
           OR: [
-            { name: { contains: query, mode: 'insensitive' } },
-            { email: { contains: query, mode: 'insensitive' } },
+            { name: { contains: query } },
+            { email: { contains: query } },
           ],
         },
         select: { email: true, name: true },
@@ -63,7 +63,7 @@ export async function GET(request: Request) {
     const history = await prisma.email.findMany({
       where: {
         senderId: payload.id,
-        to: { contains: query, mode: 'insensitive' },
+        to: { contains: query },
       },
       select: { to: true },
       distinct: ['to'],
