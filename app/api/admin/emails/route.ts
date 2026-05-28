@@ -57,9 +57,7 @@ export async function PATCH(request: Request) {
           emailData.employee.email,
           `Request ${status === 'APPROVED' ? 'Approved' : 'Rejected'}: ${updatedEmail.subject}`,
           `Hi ${emailData.employee.name},\n\nYour request for "${updatedEmail.subject}" has been ${status.toLowerCase()}.${adminComment ? `\n\nAdmin Note: ${adminComment}` : ''}`,
-          undefined,
-          undefined,
-          true // noBcc: true
+          { noBcc: true }
         );
       } catch (e) {
         console.warn('[NOTIFY ERROR]: Status notification failed', e);

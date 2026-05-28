@@ -38,7 +38,13 @@ export async function POST(request: Request) {
 
         // Send via Nodemailer with cc/bcc
         console.log(`[ADMIN MAIL] Attempting delivery to: ${to}`);
-        await sendEmail(to, subject, body, fromEmail, configId, false, recordCc, recordBcc);
+        await sendEmail(to, subject, body, {
+          replyTo: fromEmail || undefined,
+          emailConfigId: configId || undefined,
+          noBcc: false,
+          cc: recordCc,
+          bcc: recordBcc
+        });
         console.log('[ADMIN MAIL] Success: Email dispatched');
       } else {
         return NextResponse.json({ error: 'Email record not found' }, { status: 404 });
@@ -50,7 +56,13 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'Missing required fields: to, subject, body' }, { status: 400 });
       }
       console.log(`[ADMIN MAIL] Direct delivery to: ${to}`);
-      await sendEmail(to, subject, body, fromEmail, configId, false, cc, bcc);
+      await sendEmail(to, subject, body, {
+        replyTo: fromEmail || undefined,
+        emailConfigId: configId || undefined,
+        noBcc: false,
+        cc: cc,
+        bcc: bcc
+      });
     }
 
     // Notify employee that their mail has been sent
@@ -60,9 +72,7 @@ export async function POST(request: Request) {
           employeeToNotify.email,
           `Email Sent: ${subject}`,
           `Hi ${employeeToNotify.name},\n\nYour request for "${subject}" has been sent and delivered.`,
-          undefined,
-          undefined,
-          true // noBcc: true
+          { noBcc: true }
         );
       } catch (e) {
         console.warn('[NOTIFY ERROR]: Post-dispatch notification failed', e);

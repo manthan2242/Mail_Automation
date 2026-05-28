@@ -23,7 +23,7 @@ export async function POST(request: Request) {
 
     // Step 1: Send real email via Nodemailer (using the common utility)
     console.log(`[MAIL] Attempting to send email via Nodemailer to: ${recipientEmail}`);
-    await sendEmail(recipientEmail, subject, body, sourceEmail);
+    await sendEmail(recipientEmail, subject, body, { replyTo: sourceEmail || undefined });
     console.log('[MAIL] Success: Email sent successfully via Nodemailer');
 
     // Step 2: Save to PostgreSQL via Prisma
