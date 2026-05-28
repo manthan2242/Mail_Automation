@@ -259,7 +259,7 @@ export default function EmailMonitoringPage() {
         <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="page-title">
             <h1 className="text-3xl font-bold text-[#1e293b] tracking-tight">Email Monitoring</h1>
-            <p className="text-[#64748b] mt-1">Review and approve employee email requests.</p>
+            <p className="text-[#64748b] mt-1">Review and approve team member email requests.</p>
           </div>
           <div className="header-actions flex gap-3">
             <Button variant="outline" onClick={fetchData} className="bg-white border-[#e2e8f0] text-[#1e293b] rounded-lg px-5 h-10 font-semibold shadow-sm hover:bg-slate-50">
@@ -396,7 +396,7 @@ export default function EmailMonitoringPage() {
                         <div className="space-y-4">
                           <div className="grid grid-cols-2 gap-4">
                             <div>
-                              <p className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider">Employee</p>
+                              <p className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider">Team Member</p>
                               <p className="text-sm font-semibold text-[#1e293b]">{email.employee?.name || 'Admin'}</p>
                             </div>
                             <div>
@@ -486,7 +486,7 @@ export default function EmailMonitoringPage() {
           <Table>
             <TableHeader>
               <TableRow className="bg-[#fafafa] hover:bg-[#fafafa]">
-                <TableHead className="px-8 py-4 text-[11px] font-bold text-[#64748b] uppercase tracking-wider">Employee Name</TableHead>
+                <TableHead className="px-8 py-4 text-[11px] font-bold text-[#64748b] uppercase tracking-wider">Team Member Name</TableHead>
                 <TableHead className="px-8 py-4 text-[11px] font-bold text-[#64748b] uppercase tracking-wider">Subject</TableHead>
                 <TableHead className="px-8 py-4 text-[11px] font-bold text-[#64748b] uppercase tracking-wider">Status</TableHead>
                 <TableHead className="px-8 py-4 text-[11px] font-bold text-[#64748b] uppercase tracking-wider">Date</TableHead>
@@ -589,7 +589,7 @@ export default function EmailMonitoringPage() {
                                 <div className="space-y-3">
                                   <Label className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider">Admin Review Comment (Optional)</Label>
                                   <Textarea 
-                                    placeholder="Add a comment for the employee..." 
+                                    placeholder="Add a comment for the team member..." 
                                     value={adminComment}
                                     onChange={(e) => setAdminComment(e.target.value)}
                                     className="min-h-[100px] rounded-2xl border-[#e2e8f0] focus:ring-[#6366f1] text-sm"

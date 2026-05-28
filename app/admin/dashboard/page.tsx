@@ -51,7 +51,7 @@ export default function AdminDashboard() {
   const statCards = [
     { title: 'Pending Approval', value: stats?.pendingEmails || 0, icon: Clock, color: 'text-amber-500' },
     { title: 'Total Emails Sent', value: stats?.totalEmails || 0, icon: Mail, color: 'text-indigo-500' },
-    { title: 'Active Employees', value: stats?.totalEmployees || 0, icon: Users, color: 'text-blue-500' },
+    { title: 'Active Team Members', value: stats?.totalEmployees || 0, icon: Users, color: 'text-blue-500' },
   ];
 
   return (
@@ -135,7 +135,7 @@ export default function AdminDashboard() {
                 <Table>
                   <TableHeader>
                     <TableRow className="bg-[#fafafa] hover:bg-[#fafafa]">
-                      <TableHead className="px-8 py-4 text-[11px] font-bold text-[#64748b] uppercase tracking-wider text-xs md:text-[11px]">Employee</TableHead>
+                      <TableHead className="px-8 py-4 text-[11px] font-bold text-[#64748b] uppercase tracking-wider text-xs md:text-[11px]">Team Member</TableHead>
                       <TableHead className="px-8 py-4 text-[11px] font-bold text-[#64748b] uppercase tracking-wider text-xs md:text-[11px]">Subject</TableHead>
                       <TableHead className="px-8 py-4 text-[11px] font-bold text-[#64748b] uppercase tracking-wider text-xs md:text-[11px]">Status</TableHead>
                     </TableRow>

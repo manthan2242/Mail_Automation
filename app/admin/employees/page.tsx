@@ -87,7 +87,7 @@ export default function EmployeesPage() {
       });
       const data = await res.json();
       if (res.ok) {
-        toast.success('Employee created successfully');
+        toast.success('Team Member created successfully');
         setIsAddOpen(false);
         setNewEmployee({ email: '', username: '', name: '' });
         fetchEmployees();
@@ -95,7 +95,7 @@ export default function EmployeesPage() {
         toast.error(data.error);
       }
     } catch (error) {
-      toast.error('Failed to create employee');
+      toast.error('Failed to create team member');
     } finally {
       setIsSubmitting(false);
     }
@@ -108,7 +108,7 @@ export default function EmployeesPage() {
   );
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this employee?')) return;
+    if (!confirm('Are you sure you want to delete this team member?')) return;
     try {
       const res = await fetch('/api/admin/employees', {
         method: 'DELETE',
@@ -119,11 +119,11 @@ export default function EmployeesPage() {
         body: JSON.stringify({ id }),
       });
       if (res.ok) {
-        toast.success('Employee deleted');
+        toast.success('Team Member deleted');
         fetchEmployees();
       }
     } catch (error) {
-      toast.error('Failed to delete employee');
+      toast.error('Failed to delete team member');
     }
   };
 
@@ -160,14 +160,14 @@ export default function EmployeesPage() {
       });
       const data = await res.json();
       if (res.ok) {
-        toast.success('Employee updated successfully');
+        toast.success('Team member updated successfully');
         setIsEditOpen(false);
         fetchEmployees();
       } else {
         toast.error(data.error);
       }
     } catch (error) {
-      toast.error('Failed to update employee');
+      toast.error('Failed to update team member');
     }
   };
 
@@ -228,7 +228,7 @@ export default function EmployeesPage() {
         fetchEmployees();
       }
     } catch (error) {
-      toast.error('Failed to update employee');
+      toast.error('Failed to update Team member');
     }
   };
 
@@ -237,7 +237,7 @@ export default function EmployeesPage() {
       <div className="space-y-10">
         <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="page-title">
-            <h1 className="text-3xl font-bold text-[#1e293b] tracking-tight">Employee Management</h1>
+            <h1 className="text-3xl font-bold text-[#1e293b] tracking-tight">Team Member Management</h1>
             <p className="text-[#64748b] mt-1">Manage your team members and their access.</p>
           </div>
           <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
@@ -245,13 +245,13 @@ export default function EmployeesPage() {
               render={
                 <Button className="bg-[#6366f1] hover:bg-[#4f46e5] text-white rounded-lg px-5 h-10 font-semibold shadow-sm shadow-indigo-100">
                   <UserPlus className="w-4 h-4 mr-2" />
-                  Add Employee
+                  Add Team Member
                 </Button>
               }
             />
             <DialogContent className="sm:max-w-[450px] bg-white rounded-[24px] border-none shadow-2xl p-0 overflow-hidden">
               <DialogHeader className="px-8 py-6 bg-[#f8fafc] border-b border-[#e2e8f0]">
-                <DialogTitle className="text-xl font-bold text-[#1e293b]">Add New Employee</DialogTitle>
+                <DialogTitle className="text-xl font-bold text-[#1e293b]">Add New Team Member</DialogTitle>
               </DialogHeader>
               <form onSubmit={handleAdd} className="p-8 space-y-6">
                 <div className="space-y-2">
@@ -290,11 +290,11 @@ export default function EmployeesPage() {
                 </div>
                 <div className="p-4 bg-[#f8fafc] rounded-xl border border-[#e2e8f0] text-[11px] text-[#64748b]">
                   <p className="font-bold text-[#1e293b] mb-1 uppercase tracking-wider">Security:</p>
-                  <p>A random password will be automatically generated and sent to the employee's email address upon creation.</p>
-                  <p className="mt-1 italic">Employee will be forced to change this on first login.</p>
+                  <p>A random password will be automatically generated and sent to the team member's email address upon creation.</p>
+                  <p className="mt-1 italic">Team Member will be forced to change this on first login.</p>
                 </div>
                 <Button type="submit" disabled={isSubmitting} className="w-full bg-[#6366f1] hover:bg-[#4f46e5] text-white rounded-xl py-6 font-bold shadow-sm shadow-indigo-100">
-                  {isSubmitting ? 'Creating...' : 'Create Employee'}
+                  {isSubmitting ? 'Creating...' : 'Create Team Member'}
                 </Button>
               </form>
             </DialogContent>
@@ -306,19 +306,19 @@ export default function EmployeesPage() {
             <div className="relative max-w-sm">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#64748b]" />
               <Input 
-                placeholder="Search employees..." 
+                placeholder="Search team members..." 
                 className="pl-10 bg-white border-[#e2e8f0] rounded-xl text-sm"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
             </div>
           </div>
-          {/* Mobile Employee List (Visible only on mobile) */}
+          {/* Mobile Team Member List (Visible only on mobile) */}
           <div className="block md:hidden">
             {loading ? (
-              <div className="text-center py-12 text-[#64748b]">Loading employees...</div>
+              <div className="text-center py-12 text-[#64748b]">Loading Team Members...</div>
             ) : filteredEmployees.length === 0 ? (
-              <div className="text-center py-12 text-[#64748b]">No employees found.</div>
+              <div className="text-center py-12 text-[#64748b]">No Team Members found.</div>
             ) : (
               <div className="divide-y divide-[#e2e8f0]">
                 {filteredEmployees.map((employee) => (
@@ -340,7 +340,7 @@ export default function EmployeesPage() {
                       />
                       <DialogContent className="w-[90vw] max-w-[400px] rounded-[24px] p-0 overflow-hidden border-none shadow-2xl">
                         <DialogHeader className="px-6 py-4 bg-[#f8fafc] border-b border-[#e2e8f0]">
-                          <DialogTitle className="text-lg font-bold text-[#1e293b]">Employee Details</DialogTitle>
+                          <DialogTitle className="text-lg font-bold text-[#1e293b]">Team Member Details</DialogTitle>
                         </DialogHeader>
                         <div className="p-6 space-y-4">
                           <div className="grid grid-cols-2 gap-4">
@@ -436,11 +436,11 @@ export default function EmployeesPage() {
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center py-12 text-[#64748b]">Loading employees...</TableCell>
+                    <TableCell colSpan={5} className="text-center py-12 text-[#64748b]">Loading Team Members...</TableCell>
                   </TableRow>
                 ) : filteredEmployees.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center py-12 text-[#64748b]">No employees found.</TableCell>
+                    <TableCell colSpan={5} className="text-center py-12 text-[#64748b]">No Team Members found.</TableCell>
                   </TableRow>
                 ) : (
                   filteredEmployees.map((employee) => (
@@ -488,7 +488,7 @@ export default function EmployeesPage() {
                             size="icon" 
                             className="text-[#64748b] hover:text-[#6366f1] hover:bg-[#eef2ff] rounded-lg"
                             onClick={() => handleOpenEdit(employee)}
-                            title="Edit Employee"
+                            title="Edit Team Member"
                           >
                             <Edit className="w-4 h-4" />
                           </Button>
@@ -497,7 +497,7 @@ export default function EmployeesPage() {
                             size="icon" 
                             className="text-[#64748b] hover:text-rose-600 hover:bg-rose-50 rounded-lg"
                             onClick={() => handleDelete(employee.id)}
-                            title="Delete Employee"
+                            title="Delete Team Member"
                           >
                             <Trash2 className="w-4 h-4" />
                           </Button>
@@ -556,7 +556,7 @@ export default function EmployeesPage() {
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
         <DialogContent className="sm:max-w-[450px] bg-white rounded-[24px] border-none shadow-2xl p-0 overflow-hidden">
           <DialogHeader className="px-8 py-6 bg-[#f8fafc] border-b border-[#e2e8f0]">
-            <DialogTitle className="text-xl font-bold text-[#1e293b]">Edit Employee</DialogTitle>
+            <DialogTitle className="text-xl font-bold text-[#1e293b]">Edit Team Member</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleUpdate} className="p-8 space-y-6">
             <div className="space-y-2">

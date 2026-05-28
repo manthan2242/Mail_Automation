@@ -34,7 +34,7 @@ export async function POST(request: Request) {
         fromEmail: sourceEmail,
         subject,
         body,
-        senderId: payload.id,
+        ...(payload.role === 'admin' ? { adminSenderId: payload.id } : { senderId: payload.id }),
         status: 'SENT',
       }
     });

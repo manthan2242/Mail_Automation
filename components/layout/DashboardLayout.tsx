@@ -53,7 +53,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const adminItems = [
     { href: '/admin/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
     { href: '/admin/mail-tool', icon: Send, label: 'Mail Writer' },
-    { href: '/admin/employees', icon: Users, label: 'Employees' },
+    { href: '/admin/employees', icon: Users, label: 'Team Members' },
     { href: '/admin/emails', icon: Mail, label: 'Email Monitoring' },
     { href: '/admin/email-configs', icon: Settings, label: 'SMTP Config' },
     { href: '/admin/api-keys', icon: Key, label: 'API Keys' },
