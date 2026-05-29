@@ -33,8 +33,17 @@ export async function POST(request: Request) {
     let is2FAVerified = true;
     let requires2FA = false;
 
+    // Determine if OTP/2FA is required
+    let shouldEnforce2FA = false;
+    if (userRole === 'admin') {
+      shouldEnforce2FA = (user as any).twoFactorEnabled;
+    } else if (userRole === 'employee') {
+      // OTP is only needed for the 1st time login of an employee
+      shouldEnforce2FA = (user as any).isFirstLogin;
+    }
+
     // 2FA Enforcement Block (for both Admin and Employee)
-    if (user && (user as any).twoFactorEnabled) {
+    if (user && shouldEnforce2FA) {
       is2FAVerified = false;
       requires2FA = true;
 
@@ -60,14 +69,12 @@ export async function POST(request: Request) {
           try {
             console.log(`[AUTH] Dispatching OTP ONLY to login email: ${user.email}`);
             
-            // 2. Send with noBcc: true (6th argument) to prevent duplicates in SMTP box
+            // 2. Send with noBcc: true to prevent duplicates in SMTP box
             await sendEmail(
               user.email,
               'Security Verification - Your OTP Code',
               `Your security verification OTP code is: ${code}. This code will expire in 5 minutes.`,
-              undefined,
-              undefined,
-              true // noBcc: true
+              { noBcc: true }
             );
             
             // 3. Save to DB AFTER successful send

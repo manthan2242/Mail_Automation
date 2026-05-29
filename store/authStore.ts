@@ -7,6 +7,7 @@ interface User {
   name: string;
   role: 'admin' | 'employee';
   is2FAVerified?: boolean;
+  isFirstLogin?: boolean;
 }
 
 interface AuthState {

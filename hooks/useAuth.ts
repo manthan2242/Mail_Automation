@@ -15,13 +15,13 @@ export const useAuth = () => {
     const data = await res.json();
     if (res.ok) {
       setAuth(data.user, data.token);
-      if (data.user.role === 'admin') {
-        window.location.href = '/admin/dashboard';
+      if (data.requires2FA) {
+        window.location.href = '/auth/verify-otp';
       } else {
-        if (data.user.isFirstLogin) {
-          window.location.href = '/auth/change-password';
+        if (data.user.role === 'admin') {
+          window.location.href = '/admin/dashboard';
         } else {
-          window.location.href = '/auth/verify-otp';
+          window.location.href = '/employee/dashboard';
         }
       }
       return { success: true };

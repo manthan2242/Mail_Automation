@@ -83,13 +83,13 @@ export default function GenerateEmailPage() {
       .then(data => {
         if (Array.isArray(data)) {
           setConfigs(data);
-          if (data.length > 0) setSourceEmail(data[0].email);
+          setSourceEmail(user?.email || (data.length > 0 ? data[0].email : ''));
         }
       })
       .catch(() => {});
 
     setKeysLoading(false);
-  }, [token]);
+  }, [token, user]);
 
   const handleGenerate = async () => {
     if (!subject) {
@@ -180,6 +180,11 @@ export default function GenerateEmailPage() {
                   <SelectContent className="bg-white rounded-xl border-[#e2e8f0] shadow-xl">
                     <SelectGroup>
                       <SelectLabel className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider px-3 py-2">Available Senders</SelectLabel>
+                      {user?.email && (
+                        <SelectItem value={user.email} className="rounded-lg mx-1 my-0.5 hover:bg-slate-50 font-medium">
+                          {user.email} (Personal)
+                        </SelectItem>
+                      )}
                       {configs.map(config => (
                         <SelectItem key={config.id} value={config.email} className="rounded-lg mx-1 my-0.5 hover:bg-slate-50">
                           {config.email}

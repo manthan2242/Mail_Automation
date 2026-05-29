@@ -76,7 +76,11 @@ export default function VerifyOTPPage() {
         if (user?.role === 'admin') {
           router.push('/admin/dashboard');
         } else {
-          router.push('/employee/dashboard');
+          if (user?.isFirstLogin) {
+            router.push('/auth/change-password');
+          } else {
+            router.push('/employee/dashboard');
+          }
         }
       } else {
         toast.error(data.error);

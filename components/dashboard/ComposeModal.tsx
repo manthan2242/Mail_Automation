@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Minus, Maximize2, X, Paperclip, Link as LinkIcon, Smile, Image as ImageIcon, Trash2, Send, Triangle, Lock, PenTool, Sparkles, Bold, Italic, Underline, AlignLeft, AlignCenter, AlignRight, List, ListOrdered, Undo, Redo, ChevronDown, HardDrive, File as FileIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 
@@ -73,14 +74,19 @@ export default function ComposeModal({ onClose }: { onClose: () => void }) {
     const fetchIdentities = async () => {
       if (!token || !user) return;
       try {
-        const endpoint = user.role === 'admin' ? '/api/admin/email-configs' : '/api/employee/assigned-emails';
+        const isAdmin = user.role === 'admin';
+        const endpoint = isAdmin ? '/api/admin/email-configs' : '/api/employee/assigned-emails';
         const res = await fetch(endpoint, {
           headers: { Authorization: `Bearer ${token}` }
         });
         const data = await res.json();
         if (Array.isArray(data)) {
           setIdentities(data);
-          if (data.length > 0) setSelectedIdentity(data[0].email);
+          if (isAdmin) {
+            setSelectedIdentity('default');
+          } else {
+            setSelectedIdentity(user.email || (data.length > 0 ? data[0].email : ''));
+          }
         }
       } catch (err) {} finally {
         setLoading(false);
@@ -218,27 +224,43 @@ export default function ComposeModal({ onClose }: { onClose: () => void }) {
       toast.error('To, Subject, and Body are required');
       return;
     }
+    if (!selectedIdentity) {
+      toast.error('From email is required');
+      return;
+    }
     setSending(true);
     try {
       const isAdmin = user?.role === 'admin';
-      const endpoint = isAdmin ? '/api/admin/send-email' : '/api/employee/emails';
-      const configId = identities.find(i => i.email === selectedIdentity)?.id;
+      const endpoint = isAdmin ? '/api/admin/send-email' : '/api/employee/send-email';
+      
+      const configId = selectedIdentity === 'default' ? undefined : identities.find(i => i.email === selectedIdentity)?.id;
+      const fromEmail = selectedIdentity === 'default' ? undefined : selectedIdentity;
+
+      const payload = isAdmin ? {
+        to: to.join(','), 
+        cc: cc.join(','),
+        bcc: bcc.join(','),
+        subject, 
+        body: finalBody,
+        fromEmail: fromEmail,
+        configId: configId
+      } : {
+        recipientEmail: to.join(','),
+        cc: cc.join(','),
+        bcc: bcc.join(','),
+        subject,
+        body: finalBody,
+        sourceEmail: fromEmail || user?.email,
+        configId: configId
+      };
 
       const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ 
-          to: to.join(','), 
-          cc: cc.join(','),
-          bcc: bcc.join(','),
-          subject, 
-          body: finalBody,
-          fromEmail: selectedIdentity,
-          configId: configId
-        }),
+        body: JSON.stringify(payload),
       });
       if (res.ok) {
-        toast.success(isAdmin ? 'Email sent!' : 'Sent for approval');
+        toast.success('Email sent!');
         onClose();
       } else {
         const data = await res.json();
@@ -285,6 +307,29 @@ export default function ComposeModal({ onClose }: { onClose: () => void }) {
       </div>
 
       <div className="flex flex-col flex-1 overflow-y-auto" ref={wrapperRef}>
+        {/* From Field */}
+        <div className="relative border-b border-gray-100 px-4 py-2 flex items-center min-h-[46px]">
+          <span className="text-gray-500 text-sm font-medium w-8 shrink-0">From</span>
+          <div className="flex-1 min-w-0">
+            <Select value={selectedIdentity} onValueChange={(val) => setSelectedIdentity(val || 'default')}>
+              <SelectTrigger className="w-full max-w-[320px] sm:max-w-[400px] min-w-[260px] border-none shadow-none h-8 bg-transparent text-gray-800 font-normal px-2 hover:bg-gray-50 rounded transition-colors text-sm flex justify-between items-center">
+                <SelectValue placeholder="Select Sender" />
+              </SelectTrigger>
+              <SelectContent className="bg-white rounded-xl shadow-lg border border-gray-100 z-[200]">
+                {user?.role === 'admin' && (
+                  <SelectItem value="default" className="text-xs sm:text-sm font-medium">Default SMTP (.env)</SelectItem>
+                )}
+                {user?.role === 'employee' && user?.email && (
+                  <SelectItem value={user.email} className="text-xs sm:text-sm font-medium">{user.email} (Personal)</SelectItem>
+                )}
+                {identities.map(id => (
+                  <SelectItem key={id.id} value={id.email} className="text-xs sm:text-sm font-medium">{id.email}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
         {/* To Field */}
         <div className="relative border-b border-gray-100 px-4 py-2 flex flex-wrap items-center min-h-[46px]">
           <span className="text-gray-500 text-sm font-medium w-8 shrink-0">To</span>
@@ -351,12 +396,33 @@ export default function ComposeModal({ onClose }: { onClose: () => void }) {
            </div>
         )}
         {showBcc && (
-           <div className="relative border-b border-gray-100 px-4 py-2 flex flex-wrap items-center">
-            <span className="text-gray-500 text-sm font-medium w-8">Bcc</span>
-            <div className="flex flex-1 flex-wrap items-center">
+           <div className="relative border-b border-gray-100 px-4 py-2 flex flex-wrap items-center min-h-[46px]">
+            <span className="text-gray-500 text-sm font-medium w-8 shrink-0">Bcc</span>
+            <div className="flex flex-1 flex-wrap items-center overflow-hidden">
               {renderChips('bcc', bcc)}
-              <input type="text" className="flex-1 min-w-[100px] outline-none text-sm py-1 font-medium" value={bccInput} onChange={(e) => handleInputChange('bcc', e.target.value)} onFocus={() => setActiveField('bcc')} />
+              <input 
+                type="text" 
+                className="flex-1 min-w-[100px] outline-none text-sm sm:text-base py-1 font-medium text-gray-800 bg-transparent" 
+                value={bccInput} 
+                onChange={(e) => handleInputChange('bcc', e.target.value)} 
+                onKeyDown={(e) => handleKeyDown(e, 'bcc')}
+                onFocus={() => setActiveField('bcc')} 
+              />
             </div>
+            
+            {activeField === 'bcc' && (suggestions.length > 0 || isLoadingSuggestions) && (
+              <div className="absolute top-full left-0 w-full max-h-[250px] overflow-y-auto bg-white border border-gray-200 shadow-2xl rounded-b-lg z-[110] py-1">
+                {suggestions.map((c, i) => (
+                  <div key={i} className={`px-4 py-2 cursor-pointer flex items-center gap-3 ${highlightedIndex === i ? 'bg-blue-50' : 'hover:bg-gray-50'}`} onMouseDown={() => addRecipient('bcc', c.email)}>
+                    <div className="w-7 h-7 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-[10px] shrink-0">{c.name.charAt(0)}</div>
+                    <div className="flex flex-col min-w-0">
+                      <span className="text-xs sm:text-sm font-semibold truncate">{c.name}</span>
+                      <span className="text-[10px] sm:text-xs text-gray-500 truncate">{c.email}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
            </div>
         )}
 
