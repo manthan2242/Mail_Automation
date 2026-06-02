@@ -16,7 +16,8 @@ import {
   Clock, 
   AlertCircle,
   Send,
-  Zap
+  Zap,
+  Briefcase
 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -52,6 +53,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   const adminItems = [
     { href: '/admin/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+    { href: '/admin/clients', icon: Briefcase, label: 'Clients & Targets' },
     { href: '/admin/mail-tool', icon: Send, label: 'Mail Writer' },
     { href: '/admin/employees', icon: Users, label: 'Team Members' },
     { href: '/admin/emails', icon: Mail, label: 'Email Monitoring' },

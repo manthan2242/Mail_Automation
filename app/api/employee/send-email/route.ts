@@ -2,6 +2,7 @@ import { prisma } from '@/lib/db';
 import { verifyToken } from '@/lib/auth';
 import { sendEmail } from '@/lib/email';
 import { NextResponse } from 'next/server';
+import { checkAndIncrementTargets } from '@/lib/target-tracker';
 
 export async function POST(request: Request) {
   try {
@@ -47,6 +48,13 @@ export async function POST(request: Request) {
       }
     });
     console.log(`[DATABASE] Success: Saved to DB with ID: ${emailRecord.id}`);
+
+    // Trigger target validation and progression checks
+    try {
+      await checkAndIncrementTargets(recipientEmail, subject);
+    } catch (trackerErr) {
+      console.error('[TRACKER TRACE ERROR]:', trackerErr);
+    }
 
     return NextResponse.json({ success: true, message: 'Email sent and saved successfully', email: emailRecord });
   } catch (error: any) {

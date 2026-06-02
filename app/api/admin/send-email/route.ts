@@ -2,6 +2,7 @@ import { prisma } from '@/lib/db';
 import { verifyToken } from '@/lib/auth';
 import { sendEmail } from '@/lib/email';
 import { NextResponse } from 'next/server';
+import { checkAndIncrementTargets } from '@/lib/target-tracker';
 
 export async function POST(request: Request) {
   try {
@@ -104,6 +105,13 @@ export async function POST(request: Request) {
       });
     }
     console.log(`[DATABASE] Success: Sync complete for ${emailRecord.id}`);
+
+    // Trigger target validation and progression checks
+    try {
+      await checkAndIncrementTargets(to, subject);
+    } catch (trackerErr) {
+      console.error('[TRACKER TRACE ERROR]:', trackerErr);
+    }
 
     return NextResponse.json({ success: true, message: 'Email sent successfully', email: emailRecord });
   } catch (error: any) {

@@ -140,3 +140,46 @@ model User {
   email String  @unique
   name  String?
 }
+
+model Client {
+  id            String    @id @default(uuid())
+  name          String
+  primaryMail   String    @unique
+  secondaryMail String?
+  optionalMail  String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  projects      Project[]
+  targets       Target[]
+}
+
+model Project {
+  id         String   @id @default(uuid())
+  name       String
+  shortName  String?
+  shortName2 String?
+  clientId   String
+  client     Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  targets    Target[]
+
+  @@unique([clientId, name])
+}
+
+model Target {
+  id           String   @id @default(uuid())
+  clientId     String
+  projectId    String
+  mailCount    Int
+  frequency    String   // "DAILY" | "WEEKLY" | "MONTHLY"
+  currentCount Int      @default(0)
+  isCompleted  Boolean  @default(false)
+  lastReset    DateTime @default(now())
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  client       Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  project      Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([clientId, projectId])
+}

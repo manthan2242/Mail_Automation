@@ -2,6 +2,7 @@ import { prisma } from '@/lib/db';
 import { verifyToken } from '@/lib/auth';
 import { sendEmail } from '@/lib/email';
 import { NextResponse } from 'next/server';
+import { checkAndIncrementTargets } from '@/lib/target-tracker';
 
 export async function POST(request: Request) {
   try {
@@ -49,6 +50,13 @@ export async function POST(request: Request) {
       console.log(`[MAIL TOOL] Attempting real Nodemailer delivery to: ${to.join(', ')}`);
       await sendEmail(to, subject, body, { cc: cc || [], bcc: bcc || [] }, configId);
       console.log('[MAIL TOOL] Success: Email sent successfully');
+
+      // Trigger target validation and progression checks
+      try {
+        await checkAndIncrementTargets(to.join(', '), subject);
+      } catch (trackerErr) {
+        console.error('[TRACKER TRACE ERROR]:', trackerErr);
+      }
     }
 
     return NextResponse.json({ success: true, message: 'Process completed', historyItem });
