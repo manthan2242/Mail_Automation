@@ -11,7 +11,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Mail, CheckCircle, XCircle, Clock, Eye, Sparkles, Send, Edit } from 'lucide-react';
+import { Mail, CheckCircle, XCircle, Clock, Eye, Sparkles, Send, Edit, Paperclip } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
 import { motion } from 'motion/react';
@@ -30,6 +30,7 @@ interface Email {
   employee?: { name: string; email: string };
   adminComment?: string;
   configId?: string;
+  attachments?: string;
   createdAt: string;
 }
 
@@ -38,10 +39,30 @@ interface Config {
   email: string;
 }
 
+interface Project {
+  id: string;
+  name: string;
+  shortName?: string | null;
+  shortName2?: string | null;
+  clientId: string;
+}
+
+interface Client {
+  id: string;
+  name: string;
+  primaryMail: string;
+  secondaryMail?: string | null;
+  optionalMail?: string | null;
+  projects?: Project[];
+}
+
 export default function EmailMonitoringPage() {
   const [emails, setEmails] = useState<Email[]>([]);
   const [configs, setConfigs] = useState<Config[]>([]);
+  const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activeFilter, setActiveFilter] = useState<'all' | 'clients-only'>('all');
+  const [selectedClientId, setSelectedClientId] = useState<string>('all');
   const [selectedEmail, setSelectedEmail] = useState<Email | null>(null);
   const [adminComment, setAdminComment] = useState('');
   const [selectedFromEmail, setSelectedFromEmail] = useState('default');
@@ -52,22 +73,122 @@ export default function EmailMonitoringPage() {
   const [genLoading, setGenLoading] = useState(false);
   const [sendLoading, setSendLoading] = useState(false);
   const [composeData, setComposeData] = useState({ subject: '', body: '', to: '' });
-  const [editDraftData, setEditDraftData] = useState({ subject: '', body: '' });
+  const [editDraftData, setEditDraftData] = useState({ subject: '', body: '', to: '', cc: '', bcc: '' });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { token } = useAuth();
   const router = useRouter();
 
+  // Helper to extract email addresses from strings (e.g. "Name <email@domain.com>" or comma-separated lists)
+  const getEmailsFromString = (str: string | null | undefined): string[] => {
+    if (!str) return [];
+    return str
+      .split(',')
+      .map(email => {
+        const clean = email.trim();
+        const match = /<([^>]+)>/.exec(clean);
+        return (match ? match[1] : clean).trim().toLowerCase();
+      })
+      .filter(Boolean);
+  };
+
+  // Helper to find a Client record matching a given email address
+  const getClientForEmail = (emailStr: string): Client | undefined => {
+    const cleanEmail = emailStr.trim().toLowerCase();
+    return clients.find(client => 
+      client.primaryMail?.trim().toLowerCase() === cleanEmail ||
+      client.secondaryMail?.trim().toLowerCase() === cleanEmail ||
+      client.optionalMail?.trim().toLowerCase() === cleanEmail
+    );
+  };
+
+  // Helper to identify if an email matches a project based on client projects and email subject
+  const getMatchedProjectsForEmail = (email: Email): { clientName: string; projectName: string }[] => {
+    const toEmails = getEmailsFromString(email.to);
+    const ccEmails = getEmailsFromString(email.cc);
+    const bccEmails = getEmailsFromString(email.bcc);
+    const allEmails = [...toEmails, ...ccEmails, ...bccEmails];
+
+    const matched: { clientName: string; projectName: string }[] = [];
+    const cleanSubject = email.subject.toLowerCase();
+
+    allEmails.forEach(emailStr => {
+      const client = getClientForEmail(emailStr);
+      if (client && client.projects) {
+        client.projects.forEach((project) => {
+          const cleanProjName = project.name.toLowerCase();
+          const cleanShortName = project.shortName?.toLowerCase();
+          const cleanShortName2 = project.shortName2?.toLowerCase();
+
+          const fullMatch = cleanSubject.includes(cleanProjName);
+          const shortMatch = cleanShortName ? cleanSubject.includes(cleanShortName) : false;
+          const shortMatch2 = cleanShortName2 ? cleanSubject.includes(cleanShortName2) : false;
+
+          if (fullMatch || shortMatch || shortMatch2) {
+            if (!matched.some(m => m.projectName === project.name)) {
+              matched.push({
+                clientName: client.name,
+                projectName: project.name
+              });
+            }
+          }
+        });
+      }
+    });
+
+    return matched;
+  };
+
+  const getFilteredEmails = () => {
+    if (activeFilter === 'all') return emails;
+
+    return emails.filter(email => {
+      const toEmails = getEmailsFromString(email.to);
+      const ccEmails = getEmailsFromString(email.cc);
+      const bccEmails = getEmailsFromString(email.bcc);
+
+      const allRecipients = [...toEmails, ...ccEmails, ...bccEmails];
+      
+      if (selectedClientId === 'all') {
+        return allRecipients.some(rec => getClientForEmail(rec) !== undefined);
+      } else {
+        const client = clients.find(c => c.id === selectedClientId);
+        if (!client) return false;
+        
+        return allRecipients.some(rec => {
+          const cleanEmail = rec.trim().toLowerCase();
+          return client.primaryMail?.trim().toLowerCase() === cleanEmail ||
+            client.secondaryMail?.trim().toLowerCase() === cleanEmail ||
+            client.optionalMail?.trim().toLowerCase() === cleanEmail;
+        });
+      }
+    });
+  };
+
+  const getClientsOnlyCount = () => {
+    return emails.filter(email => {
+      const toEmails = getEmailsFromString(email.to);
+      const ccEmails = getEmailsFromString(email.cc);
+      const bccEmails = getEmailsFromString(email.bcc);
+
+      const allRecipients = [...toEmails, ...ccEmails, ...bccEmails];
+      return allRecipients.some(rec => getClientForEmail(rec) !== undefined);
+    }).length;
+  };
+
   const fetchData = async () => {
     try {
-      const [emailsRes, configsRes] = await Promise.all([
+      const [emailsRes, configsRes, clientsRes] = await Promise.all([
         fetch('/api/admin/emails', { headers: { Authorization: `Bearer ${token}` } }),
         fetch('/api/admin/email-configs', { headers: { Authorization: `Bearer ${token}` } }),
+        fetch('/api/admin/clients', { headers: { Authorization: `Bearer ${token}` } }),
       ]);
       const emailsData = await emailsRes.json();
       const configsData = await configsRes.json();
+      const clientsData = await clientsRes.json();
       
       setEmails(Array.isArray(emailsData) ? emailsData : []);
       setConfigs(Array.isArray(configsData) ? configsData : []);
+      setClients(Array.isArray(clientsData) ? clientsData : []);
 
     } catch (error) {
       toast.error('Failed to fetch data');
@@ -79,6 +200,16 @@ export default function EmailMonitoringPage() {
   useEffect(() => {
     if (token) fetchData();
   }, [token]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const filterParam = params.get('filter');
+      if (filterParam === 'clients-only') {
+        setActiveFilter('clients-only');
+      }
+    }
+  }, []);
 
   const handleAction = async (status: 'APPROVED' | 'REJECTED') => {
     setIsSubmitting(true);
@@ -95,10 +226,13 @@ export default function EmailMonitoringPage() {
           adminComment
         }),
       });
+      const data = await res.json();
       if (res.ok) {
         toast.success(`Email ${status.toLowerCase()} successfully`);
         setIsActionOpen(false);
         fetchData();
+      } else {
+        toast.error(data.error || `Failed to ${status.toLowerCase()} email`);
       }
     } catch (error) {
       toast.error('Failed to update email status');
@@ -120,15 +254,20 @@ export default function EmailMonitoringPage() {
         body: JSON.stringify({ 
           id: selectedEmail?.id, 
           subject: editDraftData.subject,
-          body: editDraftData.body
+          body: editDraftData.body,
+          to: editDraftData.to,
+          cc: editDraftData.cc || null,
+          bcc: editDraftData.bcc || null
         }),
       });
+      const data = await res.json();
       if (res.ok) {
         toast.success('Email draft updated');
         setIsEditDraftOpen(false);
         fetchData();
-        const updated = await res.json();
-        setSelectedEmail(updated);
+        setSelectedEmail(data);
+      } else {
+        toast.error(data.error || 'Failed to save changes');
       }
     } catch (error) {
       toast.error('Failed to save changes');
@@ -348,15 +487,63 @@ export default function EmailMonitoringPage() {
           </div>
         </header>
 
+        {/* Filter Tabs */}
+        <div className="flex border-b border-[#e2e8f0] gap-6">
+          <button
+            onClick={() => setActiveFilter('all')}
+            className={cn(
+              "pb-4 text-sm font-semibold transition-all relative",
+              activeFilter === 'all' 
+                ? "text-[#6366f1] border-b-2 border-[#6366f1]" 
+                : "text-[#64748b] hover:text-[#1e293b]"
+            )}
+          >
+            All Mails ({emails.length})
+          </button>
+          <button
+            onClick={() => setActiveFilter('clients-only')}
+            className={cn(
+              "pb-4 text-sm font-semibold transition-all relative",
+              activeFilter === 'clients-only' 
+                ? "text-[#6366f1] border-b-2 border-[#6366f1]" 
+                : "text-[#64748b] hover:text-[#1e293b]"
+            )}
+          >
+            Client Mails ({getClientsOnlyCount()})
+          </button>
+        </div>
+
+        {/* Client Dropdown Selector */}
+        {activeFilter === 'clients-only' && (
+          <div className="flex items-center gap-3 bg-[#f8fafc] p-4 rounded-2xl border border-[#e2e8f0] max-w-xs md:max-w-md">
+            <span className="text-xs font-bold text-[#64748b] uppercase tracking-wider whitespace-nowrap">Filter by Client:</span>
+            <Select value={selectedClientId} onValueChange={(val) => setSelectedClientId(val || 'all')}>
+              <SelectTrigger className="w-full rounded-xl border-[#e2e8f0] h-10 bg-white text-[#1e293b] font-medium shadow-sm focus:ring-[#6366f1] px-4">
+                <SelectValue placeholder="Select Client">
+                  {selectedClientId === 'all' ? 'All Clients' : clients.find(c => c.id === selectedClientId)?.name}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent className="bg-white rounded-xl">
+                <SelectItem value="all">All Clients</SelectItem>
+                {clients.map(client => (
+                  <SelectItem key={client.id} value={client.id}>
+                    {client.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+
         {/* Mobile Email List (Visible only on mobile) */}
         <div className="block md:hidden">
           {loading ? (
             <div className="text-center py-12 text-[#64748b]">Loading emails...</div>
-          ) : emails.length === 0 ? (
+          ) : getFilteredEmails().length === 0 ? (
             <div className="text-center py-12 text-[#64748b]">No emails found.</div>
           ) : (
             <div className="bg-white border-y border-[#e2e8f0] divide-y divide-[#e2e8f0]">
-              {emails.map((email) => (
+              {getFilteredEmails().map((email) => (
                 <div key={email.id} className="p-4 flex items-center justify-between hover:bg-slate-50 transition-colors">
                   <div className="flex-1 min-w-0 mr-4">
                     <div className="flex items-center gap-2 mb-1">
@@ -368,6 +555,36 @@ export default function EmailMonitoringPage() {
                       </span>
                       {getStatusBadge(email.status)}
                     </div>
+                    {/* Display Recipient (To) and Client Badge in Mobile */}
+                    <div className="mb-1 text-xs text-[#1e293b] truncate">
+                      <span className="font-semibold text-[#64748b]">To: </span>
+                      {email.to || 'N/A'}
+                    </div>
+                    {email.to && (() => {
+                      const toEmails = getEmailsFromString(email.to);
+                      const ccEmails = getEmailsFromString(email.cc);
+                      const bccEmails = getEmailsFromString(email.bcc);
+                      const allEmails = [...toEmails, ...ccEmails, ...bccEmails];
+                      const matchedClients = Array.from(new Set(
+                        allEmails
+                          .map(emailStr => getClientForEmail(emailStr))
+                          .filter((c): c is Client => !!c)
+                          .map(c => JSON.stringify({ id: c.id, name: c.name }))
+                      )).map(s => JSON.parse(s) as { id: string; name: string });
+
+                      if (matchedClients.length > 0) {
+                        return (
+                          <div className="flex flex-wrap gap-1 mb-2">
+                            {matchedClients.map(c => (
+                              <Badge key={c.id} variant="outline" className="bg-indigo-50 text-indigo-600 border-indigo-100 text-[9px] py-0 px-1 font-medium">
+                                Client: {c.name}
+                              </Badge>
+                            ))}
+                          </div>
+                        );
+                      }
+                      return null;
+                    })()}
                     <p className="text-sm font-medium text-[#64748b] truncate italic">
                       &quot;{email.subject}&quot;
                     </p>
@@ -411,16 +628,75 @@ export default function EmailMonitoringPage() {
                               <p className="text-sm text-[#64748b]">{email.cc}</p>
                             </div>
                           )}
+                          {email.bcc && (
+                            <div>
+                              <p className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider">BCC</p>
+                              <p className="text-sm text-[#64748b]">{email.bcc}</p>
+                            </div>
+                          )}
+
+                          {(() => {
+                            const matchedProjects = getMatchedProjectsForEmail(email);
+                            if (matchedProjects.length > 0) {
+                              return (
+                                <div>
+                                  <p className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider">Project</p>
+                                  <div className="flex flex-wrap gap-1.5 mt-1">
+                                    {matchedProjects.map((mp, i) => (
+                                      <Badge key={i} variant="outline" className="bg-[#eef2ff] text-[#4f46e5] border-[#c7d2fe] text-[11px] font-semibold px-1.5 py-0.5">
+                                        {mp.projectName} ({mp.clientName})
+                                      </Badge>
+                                    ))}
+                                  </div>
+                                </div>
+                              );
+                            }
+                            return null;
+                          })()}
+
+                          {email.attachments && (() => {
+                            try {
+                              const atts = JSON.parse(email.attachments);
+                              if (Array.isArray(atts) && atts.length > 0) {
+                                return (
+                                  <div className="pt-2 border-t border-[#e2e8f0]">
+                                    <p className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider mb-2">Attachments ({atts.length})</p>
+                                    <div className="flex flex-wrap gap-2">
+                                      {atts.map((att: any, idx: number) => (
+                                        <a
+                                          key={idx}
+                                          href={att.content}
+                                          download={att.filename}
+                                          className="flex items-center gap-1.5 bg-[#f1f5f9] hover:bg-[#e2e8f0] text-[#475569] text-xs font-semibold px-2.5 py-1 rounded-lg border border-[#e2e8f0] transition-colors"
+                                        >
+                                          <Paperclip className="w-3 h-3" />
+                                          <span className="truncate max-w-[120px]">{att.filename}</span>
+                                        </a>
+                                      ))}
+                                    </div>
+                                  </div>
+                                );
+                              }
+                            } catch (e) {}
+                            return null;
+                          })()}
 
                           <div className="p-4 bg-[#f8fafc] rounded-xl border border-[#e2e8f0] space-y-3">
                             <div className="flex justify-between items-center">
                               <p className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider">Subject</p>
                               <Button 
+                                type="button"
                                 variant="ghost" 
                                 size="sm" 
                                 className="h-6 text-[10px] font-bold text-[#6366f1] px-2"
                                 onClick={() => {
-                                  setEditDraftData({ subject: email.subject, body: email.body });
+                                  setEditDraftData({ 
+                                    subject: email.subject, 
+                                    body: email.body,
+                                    to: email.to || '',
+                                    cc: email.cc || '',
+                                    bcc: email.bcc || ''
+                                  });
                                   setIsEditDraftOpen(true);
                                 }}
                               >
@@ -487,6 +763,7 @@ export default function EmailMonitoringPage() {
             <TableHeader>
               <TableRow className="bg-[#fafafa] hover:bg-[#fafafa]">
                 <TableHead className="px-8 py-4 text-[11px] font-bold text-[#64748b] uppercase tracking-wider">Team Member Name</TableHead>
+                <TableHead className="px-8 py-4 text-[11px] font-bold text-[#64748b] uppercase tracking-wider">Recipient (To)</TableHead>
                 <TableHead className="px-8 py-4 text-[11px] font-bold text-[#64748b] uppercase tracking-wider">Subject</TableHead>
                 <TableHead className="px-8 py-4 text-[11px] font-bold text-[#64748b] uppercase tracking-wider">Status</TableHead>
                 <TableHead className="px-8 py-4 text-[11px] font-bold text-[#64748b] uppercase tracking-wider">Date</TableHead>
@@ -495,11 +772,11 @@ export default function EmailMonitoringPage() {
             </TableHeader>
             <TableBody>
               {loading ? (
-                <TableRow><TableCell colSpan={5} className="text-center py-12 text-[#64748b]">Loading emails...</TableCell></TableRow>
-              ) : emails.length === 0 ? (
-                <TableRow><TableCell colSpan={5} className="text-center py-12 text-[#64748b]">No emails found.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={6} className="text-center py-12 text-[#64748b]">Loading emails...</TableCell></TableRow>
+              ) : getFilteredEmails().length === 0 ? (
+                <TableRow><TableCell colSpan={6} className="text-center py-12 text-[#64748b]">No emails found.</TableCell></TableRow>
               ) : (
-                emails.map((email) => (
+                getFilteredEmails().map((email) => (
                   <TableRow key={email.id} className="hover:bg-slate-50/50 border-b border-[#e2e8f0] transition-colors">
                     <TableCell className="px-8 py-5">
                       <div className="flex items-center gap-3">
@@ -514,6 +791,49 @@ export default function EmailMonitoringPage() {
                             {email.employee ? email.employee.email : 'admin@system.com'}
                           </span>
                         </div>
+                      </div>
+                    </TableCell>
+                    <TableCell className="px-8 py-5">
+                      <div className="flex flex-col gap-1 max-w-[200px]">
+                        <span className="text-sm text-[#1e293b] truncate" title={email.to || ''}>
+                          {email.to || 'N/A'}
+                        </span>
+                        {email.cc && (
+                          <span className="text-[10px] text-[#64748b] truncate" title={`CC: ${email.cc}`}>
+                            CC: {email.cc}
+                          </span>
+                        )}
+                        {email.bcc && (
+                          <span className="text-[10px] text-[#64748b] truncate" title={`BCC: ${email.bcc}`}>
+                            BCC: {email.bcc}
+                          </span>
+                        )}
+                        {/* Display badges for client recipients */}
+                        {email.to && (() => {
+                          const toEmails = getEmailsFromString(email.to);
+                          const ccEmails = getEmailsFromString(email.cc);
+                          const bccEmails = getEmailsFromString(email.bcc);
+                          const allEmails = [...toEmails, ...ccEmails, ...bccEmails];
+                          const matchedClients = Array.from(new Set(
+                            allEmails
+                              .map(emailStr => getClientForEmail(emailStr))
+                              .filter((c): c is Client => !!c)
+                              .map(c => JSON.stringify({ id: c.id, name: c.name }))
+                          )).map(s => JSON.parse(s) as { id: string; name: string });
+
+                          if (matchedClients.length > 0) {
+                            return (
+                              <div className="flex flex-wrap gap-1 mt-1">
+                                {matchedClients.map(c => (
+                                  <Badge key={c.id} variant="outline" className="bg-indigo-50 text-indigo-600 border-indigo-100 text-[10px] py-0 px-1.5 font-medium">
+                                    Client: {c.name}
+                                  </Badge>
+                                ))}
+                              </div>
+                            );
+                          }
+                          return null;
+                        })()}
                       </div>
                     </TableCell>
                     <TableCell className="px-8 py-5 max-w-xs truncate text-sm font-medium text-[#1e293b]">{email.subject}</TableCell>
@@ -557,6 +877,58 @@ export default function EmailMonitoringPage() {
                                     <p className="text-sm text-[#475569]">{email.cc}</p>
                                   </div>
                                 )}
+                                {email.bcc && (
+                                  <div className="space-y-1 col-span-2">
+                                    <p className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider">BCC</p>
+                                    <p className="text-sm text-[#475569]">{email.bcc}</p>
+                                  </div>
+                                )}
+
+                                {(() => {
+                                  const matchedProjects = getMatchedProjectsForEmail(email);
+                                  if (matchedProjects.length > 0) {
+                                    return (
+                                      <div className="space-y-1 col-span-2">
+                                        <p className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider">Project</p>
+                                        <div className="flex flex-wrap gap-2 mt-1">
+                                          {matchedProjects.map((mp, i) => (
+                                            <Badge key={i} variant="outline" className="bg-[#eef2ff] text-[#4f46e5] border-[#c7d2fe] text-xs font-semibold px-2 py-0.5">
+                                              {mp.projectName} ({mp.clientName})
+                                            </Badge>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    );
+                                  }
+                                  return null;
+                                })()}
+
+                                {email.attachments && (() => {
+                                  try {
+                                    const atts = JSON.parse(email.attachments);
+                                    if (Array.isArray(atts) && atts.length > 0) {
+                                      return (
+                                        <div className="space-y-1 col-span-2 pt-2 border-t border-[#e2e8f0]">
+                                          <p className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider mb-2">Attachments ({atts.length})</p>
+                                          <div className="flex flex-wrap gap-2">
+                                            {atts.map((att: any, idx: number) => (
+                                              <a
+                                                key={idx}
+                                                href={att.content}
+                                                download={att.filename}
+                                                className="flex items-center gap-1.5 bg-[#f1f5f9] hover:bg-[#e2e8f0] text-[#475569] text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-[#e2e8f0] transition-colors"
+                                              >
+                                                <Paperclip className="w-3.5 h-3.5" />
+                                                <span>{att.filename}</span>
+                                              </a>
+                                            ))}
+                                          </div>
+                                        </div>
+                                      );
+                                    }
+                                  } catch (e) {}
+                                  return null;
+                                })()}
                               </div>
 
                               <div className="flex justify-between items-start border-t border-slate-100 pt-4">
@@ -569,7 +941,13 @@ export default function EmailMonitoringPage() {
                                   size="sm" 
                                   className="text-[#64748b] hover:text-[#6366f1] hover:bg-white"
                                   onClick={() => {
-                                    setEditDraftData({ subject: email.subject, body: email.body });
+                                    setEditDraftData({ 
+                                      subject: email.subject, 
+                                      body: email.body,
+                                      to: email.to || '',
+                                      cc: email.cc || '',
+                                      bcc: email.bcc || ''
+                                    });
                                     setIsEditDraftOpen(true);
                                   }}
                                 >
@@ -691,6 +1069,33 @@ export default function EmailMonitoringPage() {
             <p className="text-sm text-[#64748b]">Modify the subject or body before approval.</p>
           </DialogHeader>
           <form onSubmit={handleUpdateDraft} className="p-10 space-y-6">
+            <div className="space-y-2">
+              <Label className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider">Recipient (To)</Label>
+              <Input 
+                value={editDraftData.to}
+                onChange={(e) => setEditDraftData({ ...editDraftData, to: e.target.value })}
+                className="h-12 rounded-xl border-[#e2e8f0] font-medium"
+                required
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider">CC</Label>
+                <Input 
+                  value={editDraftData.cc}
+                  onChange={(e) => setEditDraftData({ ...editDraftData, cc: e.target.value })}
+                  className="h-12 rounded-xl border-[#e2e8f0] font-medium"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider">BCC</Label>
+                <Input 
+                  value={editDraftData.bcc}
+                  onChange={(e) => setEditDraftData({ ...editDraftData, bcc: e.target.value })}
+                  className="h-12 rounded-xl border-[#e2e8f0] font-medium"
+                />
+              </div>
+            </div>
             <div className="space-y-2">
               <Label className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider">Email Subject</Label>
               <Input 

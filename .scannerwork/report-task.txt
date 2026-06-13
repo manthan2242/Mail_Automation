@@ -1,0 +1,7 @@
+organization=manthanmeshram22
+projectKey=manthanmeshram-star_MailAuto
+serverUrl=https://sonarcloud.io
+serverVersion=8.0.0.90233
+dashboardUrl=https://sonarcloud.io/dashboard?id=manthanmeshram-star_MailAuto
+ceTaskId=AZ62qwf-6Jtg3PxylNcJ
+ceTaskUrl=https://sonarcloud.io/api/ce/task?id=AZ62qwf-6Jtg3PxylNcJ

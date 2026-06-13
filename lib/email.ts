@@ -1,6 +1,16 @@
 import nodemailer from 'nodemailer';
 import { prisma } from './db';
 
+// Cache structure on globalThis to persist SMTP transporters across requests/reloads
+const globalForTransporters = globalThis as unknown as {
+  transporters: Record<string, any>;
+};
+
+if (!globalForTransporters.transporters) {
+  globalForTransporters.transporters = {};
+}
+
+
 /**
  * Sends an email via SMTP.
  * Resolves credentials from: env vars → database EmailConfig → error.
@@ -15,6 +25,7 @@ export const sendEmail = async (
     bcc?: string | string[];
     noBcc?: boolean;
     emailConfigId?: string;
+    attachments?: { filename: string; content: string; contentType?: string }[];
   },
   emailConfigId?: string // Keep for backwards compatibility
 ) => {
@@ -58,13 +69,23 @@ export const sendEmail = async (
     throw new Error('Email credentials are not configured. Please set EMAIL_USER/PASS in .env or add an SMTP config in the Admin panel.');
   }
 
-  const transporter = nodemailer.createTransport({
-    ...(service ? { service } : { host, port, secure: port === 465 }),
-    auth: { user, pass },
-    pool: true,
-    maxConnections: 5,
-    maxMessages: 100
-  });
+  const cacheKey = `${user}_${pass}_${host || ''}_${port || 587}_${service || ''}`;
+  let transporter = globalForTransporters.transporters[cacheKey];
+
+  if (!transporter) {
+    console.log(`[SMTP CACHE MISS]: Creating new SMTP transporter connection pool for ${user}`);
+    transporter = nodemailer.createTransport({
+      ...(service ? { service } : { host, port, secure: port === 465 }),
+      auth: { user, pass },
+      pool: true,
+      maxConnections: 5,
+      maxMessages: 100,
+      idleTimeout: 30000 // Close idle connections after 30 seconds
+    } as any);
+    globalForTransporters.transporters[cacheKey] = transporter;
+  } else {
+    console.log(`[SMTP CACHE HIT]: Reusing active SMTP transporter connection pool for ${user}`);
+  }
 
   const fromEmail = opts.replyTo || process.env.FROM_EMAIL || user;
   
@@ -73,6 +94,25 @@ export const sendEmail = async (
   const ccStr = Array.isArray(opts.cc) ? opts.cc.join(', ') : opts.cc;
   const bccStr = Array.isArray(opts.bcc) ? opts.bcc.join(', ') : opts.bcc;
   
+  // Parse attachments if present
+  const nodemailerAttachments = options?.attachments?.map((att: any) => {
+    const dataUrlRegex = /^data:(.*?);base64,(.*)$/;
+    const match = dataUrlRegex.exec(att.content);
+    if (match) {
+      return {
+        filename: att.filename,
+        content: match[2],
+        encoding: 'base64',
+        contentType: match[1]
+      };
+    }
+    return {
+      filename: att.filename,
+      content: att.content,
+      contentType: att.contentType
+    };
+  });
+
   const mailOptions: nodemailer.SendMailOptions = {
     from: `"Mail Automation" <${fromEmail}>`,
     to: toStr,
@@ -80,6 +120,7 @@ export const sendEmail = async (
     subject,
     html: text?.replace(/\n/g, '<br/>'),
     ...(opts.noBcc ? {} : { bcc: bccStr ? `${bccStr},${fromEmail}` : fromEmail }),
+    ...(nodemailerAttachments && { attachments: nodemailerAttachments })
   };
 
   try {

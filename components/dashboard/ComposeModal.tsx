@@ -218,6 +218,19 @@ export default function ComposeModal({ onClose }: { onClose: () => void }) {
     }
   };
 
+  const fileToBase64 = (file: File): Promise<{ filename: string; content: string; contentType: string }> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve({
+        filename: file.name,
+        content: reader.result as string,
+        contentType: file.type
+      });
+      reader.onerror = error => reject(error);
+    });
+  };
+
   const handleSend = async () => {
     const finalBody = editorRef.current?.innerHTML || '';
     if (to.length === 0 || !subject || !finalBody.trim()) {
@@ -236,6 +249,10 @@ export default function ComposeModal({ onClose }: { onClose: () => void }) {
       const configId = selectedIdentity === 'default' ? undefined : identities.find(i => i.email === selectedIdentity)?.id;
       const fromEmail = selectedIdentity === 'default' ? undefined : selectedIdentity;
 
+      const base64Attachments = await Promise.all(
+        attachments.map(file => fileToBase64(file))
+      );
+
       const payload = isAdmin ? {
         to: to.join(','), 
         cc: cc.join(','),
@@ -243,7 +260,8 @@ export default function ComposeModal({ onClose }: { onClose: () => void }) {
         subject, 
         body: finalBody,
         fromEmail: fromEmail,
-        configId: configId
+        configId: configId,
+        attachments: base64Attachments
       } : {
         recipientEmail: to.join(','),
         cc: cc.join(','),
@@ -251,7 +269,8 @@ export default function ComposeModal({ onClose }: { onClose: () => void }) {
         subject,
         body: finalBody,
         sourceEmail: fromEmail || user?.email,
-        configId: configId
+        configId: configId,
+        attachments: base64Attachments
       };
 
       const res = await fetch(endpoint, {
@@ -260,7 +279,7 @@ export default function ComposeModal({ onClose }: { onClose: () => void }) {
         body: JSON.stringify(payload),
       });
       if (res.ok) {
-        toast.success('Email sent!');
+        toast.success(isAdmin ? 'Email sent!' : 'Email submitted for approval!');
         onClose();
       } else {
         const data = await res.json();

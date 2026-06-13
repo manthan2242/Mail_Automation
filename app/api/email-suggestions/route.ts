@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/db';
 import { verifyToken } from '@/lib/auth';
 import { NextResponse } from 'next/server';
+import { DEFAULT_DOMAINS } from '@/lib/constants';
 
 export async function GET(request: Request) {
   try {
@@ -84,7 +85,6 @@ export async function GET(request: Request) {
 
     // 5. Domain Autocomplete (Gmail style)
     if (query.includes('@')) {
-      const { DEFAULT_DOMAINS } = require('@/lib/constants');
       const [prefix, domainPart] = query.split('@');
       if (prefix) {
         const domainMatches = DEFAULT_DOMAINS

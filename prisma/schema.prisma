@@ -36,6 +36,8 @@ model Employee {
   emails           Email[]
   assignments      EmailAssignment[]
   userAiKeys       UserAiKey[]
+  assignedProjects Project[]         @relation("EmployeeProjects")
+  attendanceLogs   AttendanceLog[]
 }
 
 // Per-employee AI provider API keys
@@ -88,6 +90,7 @@ model Email {
   adminSenderId String?
   configId      String?
   adminComment  String?
+  attachments   String?
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
   config        EmailConfig? @relation(fields: [configId], references: [id], onDelete: Cascade)
@@ -162,7 +165,8 @@ model Project {
   client     Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
-  targets    Target[]
+  targets           Target[]
+  assignedEmployees Employee[] @relation("EmployeeProjects")
 
   @@unique([clientId, name])
 }
@@ -182,4 +186,14 @@ model Target {
   project      Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@unique([clientId, projectId])
+}
+
+model AttendanceLog {
+  id          String    @id @default(uuid())
+  employeeId  String
+  employee    Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  clockIn     DateTime  @default(now())
+  clockOut    DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 }

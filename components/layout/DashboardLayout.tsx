@@ -109,7 +109,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-xs font-bold text-[#1e293b] truncate">{user?.name}</p>
-              <p className="text-[10px] text-[#64748b] uppercase tracking-wider font-semibold">{user?.role}</p>
+              <p className="text-[10px] text-[#64748b] uppercase tracking-wider font-semibold">
+                {user?.role === 'employee' ? 'team member' : user?.role}
+              </p>
             </div>
           </div>
           <Button 

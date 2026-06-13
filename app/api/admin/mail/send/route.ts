@@ -51,12 +51,15 @@ export async function POST(request: Request) {
       await sendEmail(to, subject, body, { cc: cc || [], bcc: bcc || [] }, configId);
       console.log('[MAIL TOOL] Success: Email sent successfully');
 
-      // Trigger target validation and progression checks
-      try {
-        await checkAndIncrementTargets(to.join(', '), subject);
-      } catch (trackerErr) {
+      // Trigger target validation and progression checks (asynchronously)
+      checkAndIncrementTargets(
+        to.join(', '),
+        subject,
+        cc && cc.length > 0 ? cc.join(', ') : undefined,
+        bcc && bcc.length > 0 ? bcc.join(', ') : undefined
+      ).catch(trackerErr => {
         console.error('[TRACKER TRACE ERROR]:', trackerErr);
-      }
+      });
     }
 
     return NextResponse.json({ success: true, message: 'Process completed', historyItem });

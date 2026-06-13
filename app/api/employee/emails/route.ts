@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/db';
 import { verifyToken } from '@/lib/auth';
 import { NextResponse } from 'next/server';
+import { sendEmail } from '@/lib/email';
 
 export async function GET(request: Request) {
   try {
@@ -10,18 +11,22 @@ export async function GET(request: Request) {
     const payload = await verifyToken(token);
     if (!payload) return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
 
+    // Fetch only the logged-in employee's own emails
     const emails = await prisma.email.findMany({
       where: {
-        OR: [
-          { senderId: payload.id },
-          { fromEmail: payload.email },
-          { to: payload.email }
-        ]
+        senderId: payload.id
+      },
+      include: {
+        employee: {
+          select: { name: true, email: true }
+        }
       },
       orderBy: { createdAt: 'desc' },
     });
+
     return NextResponse.json(emails);
   } catch (error) {
+    console.error('Fetch employee emails error:', error);
     return NextResponse.json({ error: 'Failed to fetch emails' }, { status: 500 });
   }
 }
@@ -55,18 +60,15 @@ export async function POST(request: Request) {
       },
     });
 
-    // Send a copy to the employee for their records
-    const { sendEmail } = require('@/lib/email');
-    try {
-      await sendEmail(
-        payload.email,
-        `Draft Submitted: ${subject}`,
-        `Hi ${(payload as any).name || 'Employee'},\n\nYour request for "${subject}" has been submitted for review.`,
-        { noBcc: true }
-      );
-    } catch (e) {
+    // Send a copy to the employee for their records (asynchronously)
+    sendEmail(
+      payload.email,
+      `Draft Submitted: ${subject}`,
+      `Hi ${(payload as any).name || 'Employee'},\n\nYour request for "${subject}" has been submitted for review.`,
+      { noBcc: true }
+    ).catch((e) => {
       console.warn('[NOTIFY ERROR]: Could not send submission copy to employee', e);
-    }
+    });
 
     return NextResponse.json(email);
   } catch (error) {

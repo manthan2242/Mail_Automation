@@ -43,21 +43,44 @@ function extractEmail(emailString: string): string {
 /**
  * Checks outgoing emails against target metrics, executing period resets and target increments.
  */
-export async function checkAndIncrementTargets(to: string, subject: string) {
+export async function checkAndIncrementTargets(
+  to: string | null | undefined,
+  subject: string,
+  cc?: string | null | undefined,
+  bcc?: string | null | undefined
+) {
   console.log(`\n=== [TARGET TRACKER START] ===`);
-  console.log(`[TRACKER INPUT] Raw To: "${to}", Subject: "${subject}"`);
+  console.log(`[TRACKER INPUT] Raw To: "${to}", CC: "${cc}", BCC: "${bcc}", Subject: "${subject}"`);
 
-  if (!to || !subject) {
-    console.log(`[TRACKER SKIP] Missing 'to' or 'subject' field.`);
+  if (!to && !cc && !bcc) {
+    console.log(`[TRACKER SKIP] Missing recipient fields.`);
+    return;
+  }
+
+  if (!subject) {
+    console.log(`[TRACKER SKIP] Missing 'subject' field.`);
     return;
   }
 
   try {
     // 1. Clean and extract raw emails
-    const emailsToCheck = to
-      .split(',')
-      .map(e => extractEmail(e))
-      .filter(Boolean);
+    const emailsToCheck: string[] = [];
+    const addEmails = (fieldVal?: string | null) => {
+      if (!fieldVal) return;
+      fieldVal
+        .split(',')
+        .map(e => extractEmail(e))
+        .filter(Boolean)
+        .forEach(e => {
+          if (!emailsToCheck.includes(e)) {
+            emailsToCheck.push(e);
+          }
+        });
+    };
+
+    addEmails(to);
+    addEmails(cc);
+    addEmails(bcc);
 
     console.log(`[TRACKER PARSED] Cleaned Emails to check:`, emailsToCheck);
 

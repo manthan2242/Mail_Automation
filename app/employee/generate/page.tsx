@@ -1,13 +1,13 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
-import { Sparkles, Send, RefreshCw, Eye, EyeOff, Zap, ExternalLink } from 'lucide-react';
+import { Sparkles, Send, RefreshCw, Eye, EyeOff, Zap, ExternalLink, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'next/navigation';
@@ -45,8 +45,89 @@ interface AiKey {
 export default function GenerateEmailPage() {
   const [subject, setSubject] = useState('');
   const [body, setBody] = useState('');
-  const [recipient, setRecipient] = useState('');
   const [sourceEmail, setSourceEmail] = useState('');
+  const [recipients, setRecipients] = useState<string[]>([]);
+  const [recipientInput, setRecipientInput] = useState('');
+  const [suggestions, setSuggestions] = useState<{ name: string; email: string }[]>([]);
+  const [highlightedIndex, setHighlightedIndex] = useState(-1);
+  const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+
+  const debounceTimer = useRef<NodeJS.Timeout | null>(null);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
+        setShowSuggestions(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const fetchSuggestions = async (query: string) => {
+    if (!query.trim() || !token) {
+      setSuggestions([]);
+      return;
+    }
+    setIsLoadingSuggestions(true);
+    try {
+      const res = await fetch(`/api/email-suggestions?query=${encodeURIComponent(query)}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        setSuggestions(data);
+        setHighlightedIndex(data.length > 0 ? 0 : -1);
+      }
+    } catch (err) {
+      console.error('Suggestions fetch error:', err);
+    } finally {
+      setIsLoadingSuggestions(false);
+    }
+  };
+
+  const handleInputChange = (val: string) => {
+    setRecipientInput(val);
+    setShowSuggestions(true);
+    if (debounceTimer.current) clearTimeout(debounceTimer.current);
+    debounceTimer.current = setTimeout(() => fetchSuggestions(val), 300);
+  };
+
+  const addRecipient = (email: string) => {
+    const cleanEmail = email.trim();
+    if (cleanEmail && !recipients.includes(cleanEmail)) {
+      setRecipients([...recipients, cleanEmail]);
+    }
+    setRecipientInput('');
+    setShowSuggestions(false);
+    setSuggestions([]);
+    setHighlightedIndex(-1);
+  };
+
+  const removeRecipient = (email: string) => {
+    setRecipients(recipients.filter(r => r !== email));
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setHighlightedIndex(prev => (prev < suggestions.length - 1 ? prev + 1 : prev));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setHighlightedIndex(prev => (prev > 0 ? prev - 1 : prev));
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (highlightedIndex >= 0 && suggestions[highlightedIndex]) {
+        addRecipient(suggestions[highlightedIndex].email);
+      } else if (recipientInput.includes('@')) {
+        addRecipient(recipientInput);
+      }
+    } else if (e.key === 'Escape') {
+      setShowSuggestions(false);
+    }
+  };
   const [configs, setConfigs] = useState<EmailConfig[]>([]);
 
   // AI provider state
@@ -130,8 +211,17 @@ export default function GenerateEmailPage() {
   };
 
   const handleSend = async () => {
-    if (!recipient || !subject || !body) {
-      toast.error('Recipient, Subject and body are required');
+    let finalRecipients = [...recipients];
+    if (recipientInput.trim() && recipientInput.includes('@') && !finalRecipients.includes(recipientInput.trim())) {
+      finalRecipients.push(recipientInput.trim());
+    }
+
+    if (finalRecipients.length === 0) {
+      toast.error('At least one recipient email is required');
+      return;
+    }
+    if (!subject || !body) {
+      toast.error('Subject and body are required');
       return;
     }
     setSending(true);
@@ -140,7 +230,13 @@ export default function GenerateEmailPage() {
       const res = await fetch('/api/employee/emails', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ subject, body, to: recipient, fromEmail: sourceEmail, configId }),
+        body: JSON.stringify({ 
+          subject, 
+          body, 
+          to: finalRecipients.join(', '), 
+          fromEmail: sourceEmail, 
+          configId 
+        }),
       });
       if (res.ok) {
         toast.success('Email submitted to admin for approval');
@@ -195,16 +291,53 @@ export default function GenerateEmailPage() {
                 </Select>
               </div>
 
-              <div className="space-y-2">
+              <div className="space-y-2 relative" ref={wrapperRef}>
                 <Label className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider">Recipient (Client Email)</Label>
-                <Input
-                  placeholder="client@example.com"
-                  value={recipient}
-                  onChange={e => setRecipient(e.target.value)}
-                  className="rounded-xl border-[#e2e8f0] h-12 bg-white text-[#1e293b] font-medium"
-                  required
-                />
-                <p className="text-[10px] text-[#64748b] font-medium ml-1">📧 The final destination for this email after approval.</p>
+                <div className="flex flex-wrap items-center gap-1.5 p-2 rounded-xl border border-[#e2e8f0] bg-white min-h-[48px] focus-within:ring-2 focus-within:ring-indigo-500 focus-within:border-transparent transition-all">
+                  {recipients.map((email, idx) => (
+                    <div key={idx} className="flex items-center bg-[#f1f5f9] rounded-lg px-2.5 py-1 text-xs font-semibold text-[#334155] border border-slate-200">
+                      <span className="truncate max-w-[150px]">{email}</span>
+                      <button 
+                        type="button" 
+                        onClick={() => removeRecipient(email)}
+                        className="ml-1.5 text-slate-400 hover:text-slate-600 transition-colors"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                  <input
+                    type="text"
+                    placeholder={recipients.length === 0 ? "client@example.com" : ""}
+                    value={recipientInput}
+                    onChange={e => handleInputChange(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    className="flex-1 min-w-[120px] outline-none text-sm font-medium text-[#1e293b] bg-transparent"
+                  />
+                </div>
+                
+                {showSuggestions && (suggestions.length > 0 || isLoadingSuggestions) && (
+                  <div className="absolute top-[calc(100%+4px)] left-0 w-full max-h-[220px] overflow-y-auto bg-white border border-[#e2e8f0] shadow-xl rounded-2xl z-50 py-1.5">
+                    {isLoadingSuggestions ? (
+                      <div className="px-4 py-2 text-xs text-slate-400">Loading suggestions...</div>
+                    ) : (
+                      suggestions.map((c, i) => (
+                        <div 
+                          key={i} 
+                          className={`px-4 py-2.5 cursor-pointer flex items-center gap-3 transition-colors ${highlightedIndex === i ? 'bg-indigo-50/75 text-indigo-900' : 'hover:bg-slate-50 text-slate-700'}`} 
+                          onMouseDown={() => addRecipient(c.email)}
+                        >
+                          <div className="w-6 h-6 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-[10px] shrink-0">{c.name.charAt(0)}</div>
+                          <div className="flex flex-col min-w-0">
+                            <span className="text-xs font-semibold truncate">{c.name}</span>
+                            <span className="text-[10px] text-slate-400 truncate">{c.email}</span>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
+                <p className="text-[10px] text-[#64748b] font-medium ml-1">📧 The final destination for this email after approval. Press Enter to add multiple emails.</p>
               </div>
             </div>
 

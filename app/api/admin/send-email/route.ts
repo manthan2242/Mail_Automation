@@ -15,7 +15,7 @@ export async function POST(request: Request) {
     }
 
     const bodyData = await request.json();
-    let { to, subject, body, fromEmail, configId, emailId } = bodyData;
+    let { to, cc, bcc, subject, body, fromEmail, configId, emailId, attachments } = bodyData;
 
     // If emailId is provided, fetch the approved draft from the database
     let employeeToNotify: { email: string, name: string } | null = null;
@@ -29,22 +29,24 @@ export async function POST(request: Request) {
         to = to || record.to;
         subject = subject || record.subject;
         body = body || record.body;
-        // Also capture cc/bcc from record if available
-        const recordCc = record.cc || undefined;
-        const recordBcc = record.bcc || undefined;
+        // Capture cc/bcc from record if available
+        cc = cc || record.cc || undefined;
+        bcc = bcc || record.bcc || undefined;
         
         if (record.employee) {
           employeeToNotify = { email: record.employee.email, name: record.employee.name };
         }
 
-        // Send via Nodemailer with cc/bcc
+        const recordAttachments = record.attachments ? JSON.parse(record.attachments) : undefined;
+        // Send via Nodemailer with cc/bcc and attachments
         console.log(`[ADMIN MAIL] Attempting delivery to: ${to}`);
         await sendEmail(to, subject, body, {
           replyTo: fromEmail || undefined,
           emailConfigId: configId || undefined,
           noBcc: false,
-          cc: recordCc,
-          bcc: recordBcc
+          cc: cc,
+          bcc: bcc,
+          attachments: recordAttachments
         });
         console.log('[ADMIN MAIL] Success: Email dispatched');
       } else {
@@ -52,7 +54,6 @@ export async function POST(request: Request) {
       }
     } else {
       // Direct send from admin tool
-      const { cc, bcc } = bodyData;
       if (!to || !subject || !body) {
         return NextResponse.json({ error: 'Missing required fields: to, subject, body' }, { status: 400 });
       }
@@ -62,22 +63,21 @@ export async function POST(request: Request) {
         emailConfigId: configId || undefined,
         noBcc: false,
         cc: cc,
-        bcc: bcc
+        bcc: bcc,
+        attachments: attachments || undefined
       });
     }
 
-    // Notify employee that their mail has been sent
+    // Notify employee that their mail has been sent (asynchronously)
     if (employeeToNotify) {
-      try {
-        await sendEmail(
-          employeeToNotify.email,
-          `Email Sent: ${subject}`,
-          `Hi ${employeeToNotify.name},\n\nYour request for "${subject}" has been sent and delivered.`,
-          { noBcc: true }
-        );
-      } catch (e) {
+      sendEmail(
+        employeeToNotify.email,
+        `Email Sent: ${subject}`,
+        `Hi ${employeeToNotify.name},\n\nYour request for "${subject}" has been sent and delivered.`,
+        { noBcc: true }
+      ).catch((e) => {
         console.warn('[NOTIFY ERROR]: Post-dispatch notification failed', e);
-      }
+      });
     }
 
     // Step 2: Update existing record or save new one
@@ -95,23 +95,24 @@ export async function POST(request: Request) {
       emailRecord = await prisma.email.create({
         data: {
           to,
+          cc: cc || null,
+          bcc: bcc || null,
           fromEmail: fromEmail || process.env.EMAIL_USER || 'admin@system.com',
           subject,
           body,
           status: 'SENT',
           adminSenderId: payload.id,
-          configId: configId || undefined
+          configId: configId || undefined,
+          attachments: attachments ? JSON.stringify(attachments) : null
         }
       });
     }
     console.log(`[DATABASE] Success: Sync complete for ${emailRecord.id}`);
 
-    // Trigger target validation and progression checks
-    try {
-      await checkAndIncrementTargets(to, subject);
-    } catch (trackerErr) {
+    // Trigger target validation and progression checks (asynchronously)
+    checkAndIncrementTargets(to, subject, cc, bcc).catch(trackerErr => {
       console.error('[TRACKER TRACE ERROR]:', trackerErr);
-    }
+    });
 
     return NextResponse.json({ success: true, message: 'Email sent successfully', email: emailRecord });
   } catch (error: any) {

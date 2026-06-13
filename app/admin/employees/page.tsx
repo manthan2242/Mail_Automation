@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
-import { Plus, Search, UserPlus, Trash2, Edit, ShieldCheck, Mail as MailIcon, Settings, CheckCircle } from 'lucide-react';
+import { Plus, Search, UserPlus, Trash2, Edit, ShieldCheck, Mail as MailIcon, Settings, CheckCircle, Briefcase, Clock } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
 import { motion } from 'motion/react';
@@ -128,9 +128,36 @@ export default function EmployeesPage() {
   };
 
   const [isAssignOpen, setIsAssignOpen] = useState(false);
-  const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [availableConfigs, setAvailableConfigs] = useState<any[]>([]);
+  const [isProjectAssignOpen, setIsProjectAssignOpen] = useState(false);
+  const [availableProjects, setAvailableProjects] = useState<any[]>([]);
+  const [currentProjectAssignments, setCurrentProjectAssignments] = useState<string[]>([]);
+  const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [currentAssignments, setCurrentAssignments] = useState<string[]>([]);
+  const [isAttendanceOpen, setIsAttendanceOpen] = useState(false);
+  const [attendanceLogs, setAttendanceLogs] = useState<any[]>([]);
+  const [attendanceLoading, setAttendanceLoading] = useState(false);
+
+  const handleOpenAttendance = async (employee: Employee) => {
+    setSelectedEmployee(employee);
+    setIsAttendanceOpen(true);
+    setAttendanceLoading(true);
+    try {
+      const res = await fetch(`/api/admin/employees/attendance?employeeId=${employee.id}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setAttendanceLogs(data);
+      } else {
+        toast.error(data.error || 'Failed to load attendance logs');
+      }
+    } catch (err) {
+      toast.error('Failed to load attendance logs');
+    } finally {
+      setAttendanceLoading(false);
+    }
+  };
   
   const handleOpenEdit = (employee: Employee) => {
     setEditingEmployee(employee);
@@ -185,6 +212,46 @@ export default function EmployeesPage() {
       setCurrentAssignments(assignmentsData.map((a: any) => a.emailAccountId));
     } catch (err) {
       toast.error('Failed to load assignments');
+    }
+  };
+
+  const handleOpenProjectAssign = async (employee: Employee) => {
+    setSelectedEmployee(employee);
+    setIsProjectAssignOpen(true);
+    try {
+      const res = await fetch(`/api/admin/employees/project-assignments?employeeId=${employee.id}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      setAvailableProjects(data.allProjects || []);
+      setCurrentProjectAssignments(data.currentAssignments || []);
+    } catch (err) {
+      toast.error('Failed to load project assignments');
+    }
+  };
+
+  const handleToggleProjectAssignment = async (projectId: string) => {
+    const isAssigned = currentProjectAssignments.includes(projectId);
+    try {
+      const res = await fetch('/api/admin/assign-project', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ 
+          employeeId: selectedEmployee?.id, 
+          projectId
+        }),
+      });
+      if (res.ok) {
+        toast.success(isAssigned ? 'Project assignment removed' : 'Project assigned successfully');
+        setCurrentProjectAssignments(prev => 
+          isAssigned ? prev.filter(id => id !== projectId) : [...prev, projectId]
+        );
+      }
+    } catch (err) {
+      toast.error('Failed to update project assignment');
     }
   };
 
@@ -477,6 +544,24 @@ export default function EmployeesPage() {
                           <Button 
                             variant="ghost" 
                             size="icon" 
+                            className="text-[#64748b] hover:text-indigo-600 hover:bg-indigo-50 rounded-lg"
+                            onClick={() => handleOpenProjectAssign(employee)}
+                            title="Assign Projects"
+                          >
+                            <Briefcase className="w-4 h-4 text-indigo-500" />
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="text-[#64748b] hover:text-amber-600 hover:bg-amber-50 rounded-lg"
+                            onClick={() => handleOpenAttendance(employee)}
+                            title="View Attendance Logs"
+                          >
+                            <Clock className="w-4 h-4 text-amber-500" />
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
                             className="text-[#64748b] hover:text-[#6366f1] hover:bg-[#eef2ff] rounded-lg"
                             onClick={() => handleSendOTP(employee.id)}
                             title="Send Login OTP"
@@ -553,6 +638,119 @@ export default function EmployeesPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={isProjectAssignOpen} onOpenChange={setIsProjectAssignOpen}>
+        <DialogContent className="sm:max-w-[500px] bg-white rounded-[24px] border-none shadow-2xl p-0 overflow-hidden">
+          <DialogHeader className="px-8 py-6 bg-[#f8fafc] border-b border-[#e2e8f0]">
+            <DialogTitle className="text-xl font-bold text-[#1e293b]">Project Assignments</DialogTitle>
+            <p className="text-sm text-[#64748b]">Assign client projects to {selectedEmployee?.name}</p>
+          </DialogHeader>
+          <div className="p-8 space-y-4">
+            {availableProjects.length === 0 ? (
+              <p className="text-center py-4 text-[#64748b]">No projects configured.</p>
+            ) : (
+              <div className="space-y-3 max-h-[300px] overflow-y-auto pr-1">
+                {availableProjects.map((project) => (
+                  <div 
+                    key={project.id} 
+                    className={cn(
+                      "p-4 rounded-xl border transition-all cursor-pointer flex items-center justify-between",
+                      currentProjectAssignments.includes(project.id) 
+                        ? "border-[#6366f1] bg-[#eef2ff] shadow-sm" 
+                        : "border-[#e2e8f0] hover:border-[#cbd5e1] bg-white"
+                    )}
+                    onClick={() => handleToggleProjectAssignment(project.id)}
+                  >
+                    <div>
+                      <p className="text-sm font-bold text-[#1e293b]">{project.name}</p>
+                      <p className="text-[10px] text-[#64748b] uppercase tracking-wider">Client: {project.client?.name}</p>
+                    </div>
+                    {currentProjectAssignments.includes(project.id) && (
+                      <div className="w-5 h-5 rounded-full bg-[#6366f1] flex items-center justify-center">
+                        <CheckCircle className="w-3 h-3 text-white" />
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+            <Button onClick={() => setIsProjectAssignOpen(false)} className="w-full bg-[#1e293b] text-white rounded-xl py-6 mt-4">
+              Close
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isAttendanceOpen} onOpenChange={setIsAttendanceOpen}>
+        <DialogContent className="sm:max-w-[550px] bg-white rounded-[24px] border-none shadow-2xl p-0 overflow-hidden">
+          <DialogHeader className="px-8 py-6 bg-[#f8fafc] border-b border-[#e2e8f0]">
+            <DialogTitle className="text-xl font-bold text-[#1e293b]">Attendance History</DialogTitle>
+            <p className="text-sm text-[#64748b]">View clocking activities for {selectedEmployee?.name}</p>
+          </DialogHeader>
+          <div className="p-8 space-y-4">
+            {attendanceLoading ? (
+              <p className="text-center py-8 text-[#64748b]">Loading attendance logs...</p>
+            ) : attendanceLogs.length === 0 ? (
+              <p className="text-center py-8 text-[#64748b]">No attendance records found for this user.</p>
+            ) : (
+              <div className="max-h-[350px] overflow-y-auto pr-1">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-[#fafafa] hover:bg-[#fafafa]">
+                      <TableHead className="px-4 py-3 text-[10px] font-bold text-[#64748b] uppercase tracking-wider">Date</TableHead>
+                      <TableHead className="px-4 py-3 text-[10px] font-bold text-[#64748b] uppercase tracking-wider">Clock In</TableHead>
+                      <TableHead className="px-4 py-3 text-[10px] font-bold text-[#64748b] uppercase tracking-wider">Clock Out</TableHead>
+                      <TableHead className="px-4 py-3 text-[10px] font-bold text-[#64748b] uppercase tracking-wider">Duration</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {attendanceLogs.map((log) => {
+                      const clockInDate = new Date(log.clockIn);
+                      const clockOutDate = log.clockOut ? new Date(log.clockOut) : null;
+                      
+                      // Duration calculation
+                      let durationStr = '-';
+                      if (clockOutDate) {
+                        const diffMs = clockOutDate.getTime() - clockInDate.getTime();
+                        const diffMins = Math.floor(diffMs / 60000);
+                        const hrs = Math.floor(diffMins / 60);
+                        const mins = diffMins % 60;
+                        durationStr = hrs > 0 ? `${hrs}h ${mins}m` : `${mins}m`;
+                      } else {
+                        durationStr = 'Active';
+                      }
+
+                      return (
+                        <TableRow key={log.id} className="hover:bg-slate-50/50 border-b border-[#e2e8f0]">
+                          <TableCell className="px-4 py-3 text-xs font-semibold text-[#1e293b]">
+                            {clockInDate.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}
+                          </TableCell>
+                          <TableCell className="px-4 py-3 text-xs text-[#64748b]">
+                            {clockInDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </TableCell>
+                          <TableCell className="px-4 py-3 text-xs text-[#64748b]">
+                            {clockOutDate 
+                              ? clockOutDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                              : <span className="text-emerald-600 font-bold animate-pulse">Active Session</span>
+                            }
+                          </TableCell>
+                          <TableCell className="px-4 py-3 text-xs font-medium text-[#1e293b]">
+                            {durationStr}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+            <Button onClick={() => setIsAttendanceOpen(false)} className="w-full bg-[#1e293b] text-white rounded-xl py-6 mt-4">
+              Close
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
         <DialogContent className="sm:max-w-[450px] bg-white rounded-[24px] border-none shadow-2xl p-0 overflow-hidden">
           <DialogHeader className="px-8 py-6 bg-[#f8fafc] border-b border-[#e2e8f0]">

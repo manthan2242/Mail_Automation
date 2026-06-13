@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -314,8 +315,9 @@ export default function ClientsPage() {
   const activeClientsCount = clients.length;
   const activeTargetsCount = targets.length;
   const completedTargetsCount = targets.filter(t => t.isCompleted).length;
+  const totalProgress = targets.reduce((sum, t) => sum + (t.mailCount > 0 ? Math.min(t.currentCount / t.mailCount, 1) : 0), 0);
   const targetSuccessRate = activeTargetsCount > 0 
-    ? Math.round((completedTargetsCount / activeTargetsCount) * 100) 
+    ? Math.round((totalProgress / activeTargetsCount) * 100) 
     : 0;
 
   // Filtering clients
@@ -338,6 +340,12 @@ export default function ClientsPage() {
             <p className="text-[#64748b] mt-1">Configure client directories, projects, and email SLA volume targets.</p>
           </div>
           <div className="flex gap-2 flex-wrap">
+            <Link href="/admin/emails?filter=clients-only">
+              <Button variant="outline" className="bg-white border-[#e2e8f0] text-[#1e293b] rounded-xl shadow-sm h-10 px-4 font-semibold text-sm hover:bg-slate-50">
+                <Mail className="w-4 h-4 mr-2 text-indigo-500" />
+                Client Mail History
+              </Button>
+            </Link>
             
             {/* Add Client Dialog Trigger */}
             <Dialog open={clientModalOpen} onOpenChange={(open) => {
@@ -791,6 +799,7 @@ export default function ClientsPage() {
                                   variant="ghost" 
                                   size="sm" 
                                   onClick={() => handleEditClient(client)}
+                                  title="Edit Client"
                                   className="text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg h-8 px-2 transition-colors"
                                 >
                                   <Edit3 className="w-4 h-4" />
@@ -799,6 +808,7 @@ export default function ClientsPage() {
                                   variant="ghost" 
                                   size="sm" 
                                   onClick={() => handleDeleteClient(client.id)}
+                                  title="Delete Client"
                                   className="text-slate-500 hover:text-red-500 hover:bg-red-50 rounded-lg h-8 px-2 transition-colors"
                                 >
                                   <Trash2 className="w-4 h-4" />

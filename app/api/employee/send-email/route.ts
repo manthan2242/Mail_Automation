@@ -12,7 +12,7 @@ export async function POST(request: Request) {
     const payload = await verifyToken(token);
     if (!payload) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const { recipientEmail, cc, bcc, subject, body, sourceEmail, configId } = await request.json();
+    const { recipientEmail, cc, bcc, subject, body, sourceEmail, configId, attachments } = await request.json();
     
     if (!sourceEmail || sourceEmail.trim() === "") {
         return NextResponse.json({ error: 'Source email is required' }, { status: 400 });
@@ -22,41 +22,78 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Missing recipient, subject or body' }, { status: 400 });
     }
 
-    // Step 1: Send real email via Nodemailer (using the common utility)
-    console.log(`[MAIL] Attempting to send email via Nodemailer to: ${recipientEmail}`);
-    await sendEmail(recipientEmail, subject, body, { 
-      replyTo: sourceEmail || undefined,
-      emailConfigId: configId || undefined,
-      cc: cc || undefined,
-      bcc: bcc || undefined
-    });
-    console.log('[MAIL] Success: Email sent successfully via Nodemailer');
+    const isAdmin = payload.role === 'admin';
 
-    // Step 2: Save to PostgreSQL via Prisma
-    console.log('[DATABASE] Saving email record to DB...');
-    const emailRecord = await prisma.email.create({
-      data: {
-        to: recipientEmail,
-        cc: cc || null,
-        bcc: bcc || null,
-        fromEmail: sourceEmail,
-        subject,
-        body,
-        ...(payload.role === 'admin' ? { adminSenderId: payload.id } : { senderId: payload.id }),
-        configId: configId || null,
-        status: 'SENT',
-      }
-    });
-    console.log(`[DATABASE] Success: Saved to DB with ID: ${emailRecord.id}`);
+    let emailRecord;
+    if (isAdmin) {
+      // Step 1: Send real email via Nodemailer immediately for admins
+      console.log(`[MAIL] Admin sending: Attempting to send email via Nodemailer to: ${recipientEmail}`);
+      await sendEmail(recipientEmail, subject, body, { 
+        replyTo: sourceEmail || undefined,
+        emailConfigId: configId || undefined,
+        cc: cc || undefined,
+        bcc: bcc || undefined,
+        attachments: attachments || undefined
+      });
+      console.log('[MAIL] Success: Email sent successfully via Nodemailer');
 
-    // Trigger target validation and progression checks
-    try {
-      await checkAndIncrementTargets(recipientEmail, subject);
-    } catch (trackerErr) {
-      console.error('[TRACKER TRACE ERROR]:', trackerErr);
+      // Step 2: Save to PostgreSQL via Prisma with SENT status
+      console.log('[DATABASE] Saving email record to DB...');
+      emailRecord = await prisma.email.create({
+        data: {
+          to: recipientEmail,
+          cc: cc || null,
+          bcc: bcc || null,
+          fromEmail: sourceEmail,
+          subject,
+          body,
+          adminSenderId: payload.id,
+          configId: configId || null,
+          status: 'SENT',
+          attachments: attachments ? JSON.stringify(attachments) : null,
+        }
+      });
+      console.log(`[DATABASE] Success: Saved to DB with ID: ${emailRecord.id}`);
+
+      // Trigger target validation and progression checks (asynchronously)
+      checkAndIncrementTargets(recipientEmail, subject, cc, bcc).catch(trackerErr => {
+        console.error('[TRACKER TRACE ERROR]:', trackerErr);
+      });
+    } else {
+      // For employees, save as PENDING for admin approval
+      console.log('[DATABASE] Employee sending: Saving pending email record to DB...');
+      emailRecord = await prisma.email.create({
+        data: {
+          to: recipientEmail,
+          cc: cc || null,
+          bcc: bcc || null,
+          fromEmail: sourceEmail,
+          subject,
+          body,
+          senderId: payload.id,
+          configId: configId || null,
+          status: 'PENDING',
+          attachments: attachments ? JSON.stringify(attachments) : null,
+        }
+      });
+      console.log(`[DATABASE] Success: Saved pending email to DB with ID: ${emailRecord.id}`);
+
+      // Send a copy to the employee for their records (asynchronously)
+      sendEmail(
+        payload.email,
+        `Draft Submitted: ${subject}`,
+        `Hi ${(payload as any).name || 'Employee'},\n\nYour request for "${subject}" has been submitted for review.`,
+        { noBcc: true }
+      ).catch((e) => {
+        console.warn('[NOTIFY ERROR]: Could not send submission copy to employee', e);
+      });
     }
 
-    return NextResponse.json({ success: true, message: 'Email sent and saved successfully', email: emailRecord });
+    return NextResponse.json({ 
+      success: true, 
+      message: isAdmin ? 'Email sent and saved successfully' : 'Email submitted for approval', 
+      email: emailRecord 
+    });
   } catch (error: any) {
     console.error('[FLOW ERROR]:', error.message);
     return NextResponse.json({ error: error.message || 'Failed to process email delivery' }, { status: 500 });
