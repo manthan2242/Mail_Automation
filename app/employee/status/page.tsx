@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import DOMPurify from 'dompurify';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -435,7 +436,7 @@ export default function StatusTrackingPage() {
 
                                 <div className="pt-2 border-t border-[#e2e8f0]">
                                   <p className="text-xs font-bold text-[#64748b] uppercase tracking-wider mb-2">Body:</p>
-                                  <div className="text-sm text-[#1e293b] leading-relaxed prose prose-sm max-w-none bg-white p-4 rounded-xl border border-slate-100 italic" dangerouslySetInnerHTML={{ __html: email.body }}></div>
+                                  <div className="text-sm text-[#1e293b] leading-relaxed prose prose-sm max-w-none bg-white p-4 rounded-xl border border-slate-100 italic" dangerouslySetInnerHTML={{ __html: typeof window !== 'undefined' ? DOMPurify.sanitize(email.body) : email.body }}></div>
                                 </div>
 
                                 {email.attachments && (() => {

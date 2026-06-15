@@ -39,6 +39,42 @@ export async function PUT(
       return NextResponse.json({ error: 'Optional email addresses must be different from the Primary email address' }, { status: 400 });
     }
 
+    // Check if any input email (primary or optional) is already registered under any OTHER client
+    const allInputEmails = [primaryMail, ...uniqueEmails];
+    const existingClients = await prisma.client.findMany({
+      where: {
+        id: { not: id }
+      },
+      select: {
+        id: true,
+        name: true,
+        primaryMail: true,
+        secondaryMail: true,
+        optionalMail: true,
+      }
+    });
+
+    for (const client of existingClients) {
+      const existingEmails = new Set<string>();
+      if (client.primaryMail) existingEmails.add(client.primaryMail.toLowerCase().trim());
+      if (client.secondaryMail) existingEmails.add(client.secondaryMail.toLowerCase().trim());
+      if (client.optionalMail) {
+        client.optionalMail.split(',').forEach((e: string) => {
+          const trimmed = e.trim().toLowerCase();
+          if (trimmed) existingEmails.add(trimmed);
+        });
+      }
+
+      for (const email of allInputEmails) {
+        if (existingEmails.has(email)) {
+          return NextResponse.json(
+            { error: `Email "${email}" is already registered under client "${client.name}"` },
+            { status: 400 }
+          );
+        }
+      }
+    }
+
     console.log(`[API] PUT /api/admin/clients/${id} - Updating client`);
     const client = await prisma.client.update({
       where: { id },

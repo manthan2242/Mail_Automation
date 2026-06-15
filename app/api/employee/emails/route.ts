@@ -1,7 +1,7 @@
 import { prisma } from '@/lib/db';
 import { verifyToken } from '@/lib/auth';
 import { NextResponse } from 'next/server';
-import { sendEmail } from '@/lib/email';
+import { sendEmail, validateAttachments } from '@/lib/email';
 
 export async function GET(request: Request) {
   try {
@@ -39,10 +39,15 @@ export async function POST(request: Request) {
     const payload = await verifyToken(token);
     if (!payload) return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
 
-    const { to, cc, bcc, subject, body, fromEmail, configId } = await request.json();
+    const { to, cc, bcc, subject, body, fromEmail, configId, attachments } = await request.json();
 
     if (!subject || !body) {
       return NextResponse.json({ error: 'Subject and body are required' }, { status: 400 });
+    }
+
+    const attachmentError = validateAttachments(attachments);
+    if (attachmentError) {
+      return NextResponse.json({ error: attachmentError }, { status: 400 });
     }
 
     // Save email as PENDING for admin approval
@@ -57,6 +62,7 @@ export async function POST(request: Request) {
         senderId: payload.id,
         configId: configId || null,
         status: 'PENDING',
+        attachments: attachments ? JSON.stringify(attachments) : null,
       },
     });
 

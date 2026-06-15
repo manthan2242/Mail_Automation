@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/db';
-import { hashPassword } from '@/lib/password';
+import { hashPassword, validatePasswordComplexity } from '@/lib/password';
 import { verifyToken } from '@/lib/auth';
 import { NextResponse } from 'next/server';
 
@@ -12,6 +12,11 @@ export async function POST(request: Request) {
     if (!payload) return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
 
     const { password } = await request.json();
+    const complexityError = validatePasswordComplexity(password);
+    if (complexityError) {
+      return NextResponse.json({ error: complexityError }, { status: 400 });
+    }
+
     const hashedPassword = await hashPassword(password);
 
     await prisma.employee.update({

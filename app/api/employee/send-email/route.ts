@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/db';
 import { verifyToken } from '@/lib/auth';
-import { sendEmail } from '@/lib/email';
+import { sendEmail, validateAttachments } from '@/lib/email';
 import { NextResponse } from 'next/server';
 import { checkAndIncrementTargets } from '@/lib/target-tracker';
 
@@ -20,6 +20,11 @@ export async function POST(request: Request) {
 
     if (!recipientEmail || !subject || !body) {
       return NextResponse.json({ error: 'Missing recipient, subject or body' }, { status: 400 });
+    }
+
+    const attachmentError = validateAttachments(attachments);
+    if (attachmentError) {
+      return NextResponse.json({ error: attachmentError }, { status: 400 });
     }
 
     const isAdmin = payload.role === 'admin';

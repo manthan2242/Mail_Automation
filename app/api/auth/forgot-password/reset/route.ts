@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/db';
-import { hashPassword } from '@/lib/password';
+import { hashPassword, validatePasswordComplexity } from '@/lib/password';
 import { NextResponse } from 'next/server';
 
 export async function POST(request: Request) {
@@ -14,6 +14,11 @@ export async function POST(request: Request) {
 
     if (newPassword !== confirmPassword) {
       return NextResponse.json({ error: 'Passwords do not match' }, { status: 400 });
+    }
+
+    const complexityError = validatePasswordComplexity(newPassword);
+    if (complexityError) {
+      return NextResponse.json({ error: complexityError }, { status: 400 });
     }
 
     // Verify OTP record exists, matches, and has not expired

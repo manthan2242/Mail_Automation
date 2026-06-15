@@ -1,6 +1,7 @@
 'use client';
 
 import { use, useState, useEffect } from 'react';
+import DOMPurify from 'dompurify';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -319,7 +320,7 @@ export default function ClientEmailsPage({ params }: { params: Promise<{ id: str
                                     <p className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider mb-2">Message Body</p>
                                     <div 
                                       className="text-xs text-[#334155] leading-relaxed bg-white p-5 rounded-xl border border-slate-100 italic max-h-[220px] overflow-y-auto"
-                                      dangerouslySetInnerHTML={{ __html: email.body }}
+                                      dangerouslySetInnerHTML={{ __html: typeof window !== 'undefined' ? DOMPurify.sanitize(email.body) : email.body }}
                                     />
                                   </div>
 

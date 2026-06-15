@@ -142,3 +142,50 @@ export const sendEmail = async (
     throw new Error(error.message || 'Failed to deliver email through SMTP gateway.');
   }
 };
+
+/**
+ * Validates list of attachments for forbidden file extensions and size limit (max 5MB).
+ * Returns an error string if invalid, or null if valid.
+ */
+export function validateAttachments(attachments: any): string | null {
+  if (!attachments) return null;
+  if (!Array.isArray(attachments)) {
+    return 'Attachments must be an array';
+  }
+
+  const blockedExtensions = ['.exe', '.scr', '.bat', '.sh', '.vbs', '.cmd', '.msi', '.com', '.pif'];
+  const maxSizeBytes = 5 * 1024 * 1024; // 5MB
+
+  for (const att of attachments) {
+    if (!att || typeof att !== 'object') {
+      return 'Invalid attachment format';
+    }
+    const { filename, content } = att;
+    if (!filename || typeof filename !== 'string') {
+      return 'Attachment filename is required';
+    }
+    if (!content || typeof content !== 'string') {
+      return 'Attachment content is required';
+    }
+
+    const dotIndex = filename.lastIndexOf('.');
+    if (dotIndex === -1) {
+      continue;
+    }
+    const ext = filename.slice(dotIndex).toLowerCase();
+    if (blockedExtensions.includes(ext)) {
+      return `File type "${ext}" is blocked for security reasons`;
+    }
+
+    let base64Data = content;
+    if (content.includes(';base64,')) {
+      base64Data = content.split(';base64,')[1];
+    }
+    const buffer = Buffer.from(base64Data, 'base64');
+    if (buffer.length > maxSizeBytes) {
+      return `File "${filename}" exceeds the maximum size limit of 5MB`;
+    }
+  }
+
+  return null;
+}

@@ -9,17 +9,16 @@ export async function POST(request: Request) {
     email = email?.trim()?.toLowerCase();
 
     let userRole: 'admin' | 'employee' | null = null;
-    let user = null;
+    let user: any = null;
 
-    // Check Admin first
+    // First find the user record without verifying password yet
     const admin = await prisma.admin.findUnique({ where: { email } });
-    if (admin && (await comparePassword(password, admin.password))) {
+    if (admin) {
       userRole = 'admin';
       user = admin;
     } else {
-      // Check Employee next
       const employee = await prisma.employee.findUnique({ where: { email } });
-      if (employee && (await comparePassword(password, employee.password))) {
+      if (employee) {
         userRole = 'employee';
         user = employee;
       }
@@ -27,6 +26,61 @@ export async function POST(request: Request) {
 
     if (!user || !userRole) {
       return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
+    }
+
+    // 1. Check if user is locked out
+    const now = new Date();
+    if (user.lockedUntil && user.lockedUntil > now) {
+      const waitMinutes = Math.ceil((user.lockedUntil.getTime() - now.getTime()) / (60 * 1000));
+      return NextResponse.json({ 
+        error: `Account is locked due to multiple failed attempts. Please try again in ${waitMinutes} minutes.` 
+      }, { status: 403 });
+    }
+
+    // 2. Verify password
+    const isPasswordValid = await comparePassword(password, user.password);
+    if (!isPasswordValid) {
+      // Increment failed attempts
+      const failedAttempts = user.failedAttempts + 1;
+      const shouldLock = failedAttempts >= 5;
+      const lockedUntil = shouldLock ? new Date(now.getTime() + 15 * 60 * 1000) : null;
+
+      if (userRole === 'admin') {
+        await prisma.admin.update({
+          where: { id: user.id },
+          data: { failedAttempts, lockedUntil }
+        });
+      } else {
+        await prisma.employee.update({
+          where: { id: user.id },
+          data: { failedAttempts, lockedUntil }
+        });
+      }
+
+      if (shouldLock) {
+        return NextResponse.json({ 
+          error: 'Too many failed login attempts. Your account has been locked for 15 minutes.' 
+        }, { status: 403 });
+      }
+
+      return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
+    }
+
+    // 3. Password is valid - reset failed attempts and lockout
+    if (user.failedAttempts > 0 || user.lockedUntil) {
+      if (userRole === 'admin') {
+        await prisma.admin.update({
+          where: { id: user.id },
+          data: { failedAttempts: 0, lockedUntil: null }
+        });
+      } else {
+        await prisma.employee.update({
+          where: { id: user.id },
+          data: { failedAttempts: 0, lockedUntil: null }
+        });
+      }
+      user.failedAttempts = 0;
+      user.lockedUntil = null;
     }
 
     // Set Token
