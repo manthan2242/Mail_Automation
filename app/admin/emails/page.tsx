@@ -96,8 +96,8 @@ export default function EmailMonitoringPage() {
     const cleanEmail = emailStr.trim().toLowerCase();
     return clients.find(client => 
       client.primaryMail?.trim().toLowerCase() === cleanEmail ||
-      client.secondaryMail?.trim().toLowerCase() === cleanEmail ||
-      client.optionalMail?.trim().toLowerCase() === cleanEmail
+      client.secondaryMail?.split(',').some(e => e.trim().toLowerCase() === cleanEmail) ||
+      client.optionalMail?.split(',').some(e => e.trim().toLowerCase() === cleanEmail)
     );
   };
 
@@ -157,8 +157,8 @@ export default function EmailMonitoringPage() {
         return allRecipients.some(rec => {
           const cleanEmail = rec.trim().toLowerCase();
           return client.primaryMail?.trim().toLowerCase() === cleanEmail ||
-            client.secondaryMail?.trim().toLowerCase() === cleanEmail ||
-            client.optionalMail?.trim().toLowerCase() === cleanEmail;
+            client.secondaryMail?.split(',').some(e => e.trim().toLowerCase() === cleanEmail) ||
+            client.optionalMail?.split(',').some(e => e.trim().toLowerCase() === cleanEmail);
         });
       }
     });

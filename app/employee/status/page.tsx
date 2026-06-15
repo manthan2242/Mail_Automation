@@ -116,8 +116,8 @@ export default function StatusTrackingPage() {
       if (!client) return false;
       return (
         client.primaryMail?.trim().toLowerCase() === cleanEmail ||
-        client.secondaryMail?.trim().toLowerCase() === cleanEmail ||
-        client.optionalMail?.trim().toLowerCase() === cleanEmail
+        client.secondaryMail?.split(',').some(e => e.trim().toLowerCase() === cleanEmail) ||
+        client.optionalMail?.split(',').some(e => e.trim().toLowerCase() === cleanEmail)
       );
     });
     return matchedProject?.client;
@@ -166,8 +166,18 @@ export default function StatusTrackingPage() {
     const clientEmailSet = new Set<string>();
     allClients.forEach(client => {
       if (client.primaryMail) clientEmailSet.add(client.primaryMail.trim().toLowerCase());
-      if (client.secondaryMail) clientEmailSet.add(client.secondaryMail.trim().toLowerCase());
-      if (client.optionalMail) clientEmailSet.add(client.optionalMail.trim().toLowerCase());
+      if (client.secondaryMail) {
+        client.secondaryMail.split(',').forEach((e: string) => {
+          const trimmed = e.trim().toLowerCase();
+          if (trimmed) clientEmailSet.add(trimmed);
+        });
+      }
+      if (client.optionalMail) {
+        client.optionalMail.split(',').forEach((e: string) => {
+          const trimmed = e.trim().toLowerCase();
+          if (trimmed) clientEmailSet.add(trimmed);
+        });
+      }
     });
     return emails.filter(email => {
       const recipients = getEmailsFromString(email.to);
@@ -185,8 +195,18 @@ export default function StatusTrackingPage() {
       allClients.forEach(client => {
         if (selectedClientId === 'all' || client.id === selectedClientId) {
           if (client.primaryMail) clientEmailSet.add(client.primaryMail.trim().toLowerCase());
-          if (client.secondaryMail) clientEmailSet.add(client.secondaryMail.trim().toLowerCase());
-          if (client.optionalMail) clientEmailSet.add(client.optionalMail.trim().toLowerCase());
+          if (client.secondaryMail) {
+            client.secondaryMail.split(',').forEach((e: string) => {
+              const trimmed = e.trim().toLowerCase();
+              if (trimmed) clientEmailSet.add(trimmed);
+            });
+          }
+          if (client.optionalMail) {
+            client.optionalMail.split(',').forEach((e: string) => {
+              const trimmed = e.trim().toLowerCase();
+              if (trimmed) clientEmailSet.add(trimmed);
+            });
+          }
         }
       });
       list = list.filter(email => {

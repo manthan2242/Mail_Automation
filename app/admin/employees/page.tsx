@@ -13,6 +13,7 @@ import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
 import { motion } from 'motion/react';
 import { cn } from '@/lib/utils';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface Employee {
   id: string;
@@ -138,6 +139,9 @@ export default function EmployeesPage() {
   const [attendanceLogs, setAttendanceLogs] = useState<any[]>([]);
   const [attendanceLoading, setAttendanceLoading] = useState(false);
 
+  const [isGlobalProjectAssignOpen, setIsGlobalProjectAssignOpen] = useState(false);
+  const [globalSelectedEmployeeId, setGlobalSelectedEmployeeId] = useState<string>('');
+
   const handleOpenAttendance = async (employee: Employee) => {
     setSelectedEmployee(employee);
     setIsAttendanceOpen(true);
@@ -255,6 +259,38 @@ export default function EmployeesPage() {
     }
   };
 
+  const handleGlobalEmployeeChange = async (employeeId: string | null) => {
+    const safeId = employeeId || '';
+    setGlobalSelectedEmployeeId(safeId);
+    if (!safeId) {
+      setAvailableProjects([]);
+      setCurrentProjectAssignments([]);
+      setSelectedEmployee(null);
+      return;
+    }
+    const employee = employees.find(e => e.id === safeId);
+    if (employee) {
+      setSelectedEmployee(employee);
+    }
+    try {
+      const res = await fetch(`/api/admin/employees/project-assignments?employeeId=${safeId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      setAvailableProjects(data.allProjects || []);
+      setCurrentProjectAssignments(data.currentAssignments || []);
+    } catch (err) {
+      toast.error('Failed to load project assignments');
+    }
+  };
+
+  const handleCloseGlobalAssign = () => {
+    setIsGlobalProjectAssignOpen(false);
+    setGlobalSelectedEmployeeId('');
+    setAvailableProjects([]);
+    setCurrentProjectAssignments([]);
+  };
+
   const handleToggleAssignment = async (configId: string) => {
     const isAssigned = currentAssignments.includes(configId);
     try {
@@ -307,15 +343,24 @@ export default function EmployeesPage() {
             <h1 className="text-3xl font-bold text-[#1e293b] tracking-tight">Team Member Management</h1>
             <p className="text-[#64748b] mt-1">Manage your team members and their access.</p>
           </div>
-          <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
-            <DialogTrigger
-              render={
-                <Button className="bg-[#6366f1] hover:bg-[#4f46e5] text-white rounded-lg px-5 h-10 font-semibold shadow-sm shadow-indigo-100">
-                  <UserPlus className="w-4 h-4 mr-2" />
-                  Add Team Member
-                </Button>
-              }
-            />
+          <div className="flex gap-2 flex-wrap">
+            <Button 
+              onClick={() => setIsGlobalProjectAssignOpen(true)}
+              className="bg-white hover:bg-slate-50 text-[#1e293b] border border-[#e2e8f0] rounded-lg px-5 h-10 font-semibold shadow-sm"
+            >
+              <Briefcase className="w-4 h-4 mr-2 text-indigo-500" />
+              Assign Project
+            </Button>
+
+            <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
+              <DialogTrigger
+                render={
+                  <Button className="bg-[#6366f1] hover:bg-[#4f46e5] text-white rounded-lg px-5 h-10 font-semibold shadow-sm shadow-indigo-100">
+                    <UserPlus className="w-4 h-4 mr-2" />
+                    Add Team Member
+                  </Button>
+                }
+              />
             <DialogContent className="sm:max-w-[450px] bg-white rounded-[24px] border-none shadow-2xl p-0 overflow-hidden">
               <DialogHeader className="px-8 py-6 bg-[#f8fafc] border-b border-[#e2e8f0]">
                 <DialogTitle className="text-xl font-bold text-[#1e293b]">Add New Team Member</DialogTitle>
@@ -366,6 +411,7 @@ export default function EmployeesPage() {
               </form>
             </DialogContent>
           </Dialog>
+          </div>
         </header>
 
         <Card className="border border-[#e2e8f0] shadow-[0_2px_8px_rgba(0,0,0,0.04)] bg-white rounded-[24px] overflow-hidden">
@@ -795,6 +841,75 @@ export default function EmployeesPage() {
               {isSubmitting ? 'Saving...' : 'Save Changes'}
             </Button>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isGlobalProjectAssignOpen} onOpenChange={(open) => {
+        if (!open) handleCloseGlobalAssign();
+        else setIsGlobalProjectAssignOpen(true);
+      }}>
+        <DialogContent className="sm:max-w-[500px] bg-white rounded-[24px] border-none shadow-2xl p-0 overflow-hidden">
+          <DialogHeader className="px-8 py-6 bg-[#f8fafc] border-b border-[#e2e8f0]">
+            <DialogTitle className="text-xl font-bold text-[#1e293b]">Assign Client Projects</DialogTitle>
+            <p className="text-sm text-[#64748b]">Select a team member and configure their client project assignments.</p>
+          </DialogHeader>
+          <div className="p-8 space-y-6">
+            <div className="space-y-2">
+              <Label className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider">Select Team Member</Label>
+              <Select value={globalSelectedEmployeeId} onValueChange={handleGlobalEmployeeChange}>
+                <SelectTrigger className="border-slate-200 rounded-xl bg-white h-11">
+                  <SelectValue placeholder="Choose a team member...">
+                    {employees.find(emp => emp.id === globalSelectedEmployeeId)?.name}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent className="bg-white border-slate-200 shadow-lg z-[210]">
+                  {employees.map(emp => (
+                    <SelectItem key={emp.id} value={emp.id}>
+                      {emp.name} (@{emp.username})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {globalSelectedEmployeeId && (
+              <div className="space-y-3 pt-2">
+                <Label className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider">Assign Projects</Label>
+                {availableProjects.length === 0 ? (
+                  <p className="text-center py-4 text-[#64748b] text-xs">No projects configured in client directory.</p>
+                ) : (
+                  <div className="space-y-3 max-h-[250px] overflow-y-auto pr-1">
+                    {availableProjects.map((project) => (
+                      <div 
+                        key={project.id} 
+                        className={cn(
+                          "p-4 rounded-xl border transition-all cursor-pointer flex items-center justify-between text-xs",
+                          currentProjectAssignments.includes(project.id) 
+                            ? "border-[#6366f1] bg-[#eef2ff] shadow-sm font-semibold" 
+                            : "border-[#e2e8f0] hover:border-[#cbd5e1] bg-white text-slate-600"
+                        )}
+                        onClick={() => handleToggleProjectAssignment(project.id)}
+                      >
+                        <div>
+                          <p className="font-bold text-[#1e293b] text-sm">{project.name}</p>
+                          <p className="text-[10px] text-[#64748b] uppercase tracking-wider mt-0.5">Client: {project.client?.name}</p>
+                        </div>
+                        {currentProjectAssignments.includes(project.id) && (
+                          <div className="w-5 h-5 rounded-full bg-[#6366f1] flex items-center justify-center">
+                            <CheckCircle className="w-3 h-3 text-white" />
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            <Button onClick={handleCloseGlobalAssign} className="w-full bg-[#1e293b] text-white rounded-xl py-6 mt-4">
+              Close
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </DashboardLayout>

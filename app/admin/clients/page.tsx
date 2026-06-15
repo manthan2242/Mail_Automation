@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -28,7 +28,8 @@ import {
   UserPlus, 
   FolderPlus, 
   AlertCircle,
-  BarChart3
+  BarChart3,
+  X
 } from 'lucide-react';
 
 interface Project {
@@ -79,12 +80,54 @@ export default function ClientsPage() {
   const [editingClient, setEditingClient] = useState<Client | null>(null);
 
   // Form states
-  const [clientForm, setClientForm] = useState({
+  const [clientForm, setClientForm] = useState<{
+    name: string;
+    primaryMail: string;
+    optionalMails: string[];
+  }>({
     name: '',
     primaryMail: '',
-    secondaryMail: '',
-    optionalMail: ''
+    optionalMails: []
   });
+
+  const [optionalEmailInput, setOptionalEmailInput] = useState('');
+
+  const primaryMailInputRef = useRef<HTMLInputElement>(null);
+  const optionalMailInputRef = useRef<HTMLInputElement>(null);
+
+  const addOptionalEmail = (email: string) => {
+    const clean = email.trim().toLowerCase();
+    if (!clean || !clean.includes('@')) return;
+    if (clean === clientForm.primaryMail.trim().toLowerCase()) {
+      toast.error('Optional email must be different from the Primary email address');
+      return;
+    }
+    if (!clientForm.optionalMails.includes(clean)) {
+      setClientForm(prev => ({
+        ...prev,
+        optionalMails: [...prev.optionalMails, clean]
+      }));
+    }
+    setOptionalEmailInput('');
+  };
+
+  const removeOptionalEmail = (email: string) => {
+    setClientForm(prev => ({
+      ...prev,
+      optionalMails: prev.optionalMails.filter(e => e !== email)
+    }));
+  };
+
+  const handleOptionalEmailKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (optionalEmailInput.includes('@')) {
+        addOptionalEmail(optionalEmailInput);
+      } else if (optionalEmailInput.trim()) {
+        toast.error('Please enter a valid email address');
+      }
+    }
+  };
 
   const [projectForm, setProjectForm] = useState({
     name: '',
@@ -132,21 +175,26 @@ export default function ClientsPage() {
   // Client Handlers
   const handleClientSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!clientForm.name || !clientForm.primaryMail || !clientForm.secondaryMail) {
-      toast.error('Please enter name, primary email, and secondary email');
+    if (!clientForm.name || !clientForm.primaryMail) {
+      toast.error('Please enter name and primary email');
       return;
     }
 
     const pEmail = clientForm.primaryMail.trim().toLowerCase();
-    const sEmail = clientForm.secondaryMail.trim().toLowerCase();
-    const oEmail = clientForm.optionalMail.trim().toLowerCase();
 
-    if (pEmail === sEmail) {
-      toast.error('Primary and Secondary email addresses must be different');
-      return;
+    // Check if optionalEmailInput has something valid in it and auto-add it
+    let finalOptionalMails = [...clientForm.optionalMails];
+    const trimmedInput = optionalEmailInput.trim().toLowerCase();
+    if (trimmedInput && trimmedInput.includes('@')) {
+      if (!finalOptionalMails.includes(trimmedInput)) {
+        finalOptionalMails.push(trimmedInput);
+      }
     }
-    if (oEmail && (oEmail === pEmail || oEmail === sEmail)) {
-      toast.error('Optional Email must be different from Primary and Secondary emails');
+
+    const uniqueOptionalMails = Array.from(new Set(finalOptionalMails.map(email => email.trim().toLowerCase())));
+
+    if (uniqueOptionalMails.includes(pEmail)) {
+      toast.error('Optional email addresses must be different from the Primary email address');
       return;
     }
 
@@ -160,12 +208,17 @@ export default function ClientsPage() {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`
         },
-        body: JSON.stringify(clientForm)
+        body: JSON.stringify({
+          name: clientForm.name,
+          primaryMail: pEmail,
+          optionalMails: uniqueOptionalMails
+        })
       });
 
       if (res.ok) {
         toast.success(editingClient ? 'Client updated successfully' : 'Client created successfully');
-        setClientForm({ name: '', primaryMail: '', secondaryMail: '', optionalMail: '' });
+        setClientForm({ name: '', primaryMail: '', optionalMails: [] });
+        setOptionalEmailInput('');
         setEditingClient(null);
         setClientModalOpen(false);
         fetchData();
@@ -180,12 +233,24 @@ export default function ClientsPage() {
 
   const handleEditClient = (client: Client) => {
     setEditingClient(client);
+    
+    const optionalMails: string[] = [];
+    if (client.secondaryMail) {
+      optionalMails.push(client.secondaryMail);
+    }
+    if (client.optionalMail) {
+      client.optionalMail.split(',').forEach(e => {
+        const trimmed = e.trim();
+        if (trimmed) optionalMails.push(trimmed);
+      });
+    }
+
     setClientForm({
       name: client.name,
       primaryMail: client.primaryMail,
-      secondaryMail: client.secondaryMail || '',
-      optionalMail: client.optionalMail || ''
+      optionalMails
     });
+    setOptionalEmailInput('');
     setClientModalOpen(true);
   };
 
@@ -352,7 +417,8 @@ export default function ClientsPage() {
               setClientModalOpen(open);
               if (!open) {
                 setEditingClient(null);
-                setClientForm({ name: '', primaryMail: '', secondaryMail: '', optionalMail: '' });
+                setClientForm({ name: '', primaryMail: '', optionalMails: [] });
+                setOptionalEmailInput('');
               }
             }}>
               <DialogTrigger render={<Button className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow-sm h-10 px-4 font-semibold text-sm" />}>
@@ -373,37 +439,52 @@ export default function ClientsPage() {
                       value={clientForm.name} 
                       onChange={e => setClientForm({...clientForm, name: e.target.value})}
                       className="border-slate-200 focus:border-indigo-500 rounded-xl"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          primaryMailInputRef.current?.focus();
+                        }
+                      }}
                     />
                   </div>
                   <div className="space-y-1">
                     <label className="text-xs font-bold text-[#475569]">Primary Email</label>
                     <Input 
+                      ref={primaryMailInputRef}
                       type="email" 
                       placeholder="e.g. main@acme.com" 
                       value={clientForm.primaryMail} 
                       onChange={e => setClientForm({...clientForm, primaryMail: e.target.value})}
                       className="border-slate-200 focus:border-indigo-500 rounded-xl"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          optionalMailInputRef.current?.focus();
+                        }
+                      }}
                     />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-xs font-bold text-[#475569]">Secondary Email</label>
-                    <Input 
-                      type="email" 
-                      placeholder="e.g. secondary@acme.com" 
-                      value={clientForm.secondaryMail} 
-                      onChange={e => setClientForm({...clientForm, secondaryMail: e.target.value})}
-                      className="border-slate-200 focus:border-indigo-500 rounded-xl"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-[#475569]">Optional Email 3 (Optional)</label>
-                    <Input 
-                      type="email" 
-                      placeholder="e.g. alternate@acme.com" 
-                      value={clientForm.optionalMail} 
-                      onChange={e => setClientForm({...clientForm, optionalMail: e.target.value})}
-                      className="border-slate-200 focus:border-indigo-500 rounded-xl"
-                    />
+                    <label className="text-xs font-bold text-[#475569]">Optional / Additional Emails</label>
+                    <div className="flex flex-wrap items-center gap-1.5 p-2 min-h-[44px] border border-slate-200 rounded-xl focus-within:ring-2 focus-within:ring-indigo-500/20 focus-within:border-indigo-500 transition-all bg-white">
+                      {clientForm.optionalMails.map((email, idx) => (
+                        <div key={idx} className="flex items-center bg-[#f1f5f9] rounded-lg px-2 py-0.5 text-xs border border-[#e2e8f0] max-w-[200px] shrink-0">
+                          <span className="text-[#334155] font-semibold truncate mr-1.5">{email}</span>
+                          <X className="w-3.5 h-3.5 text-[#94a3b8] hover:text-[#ef4444] cursor-pointer shrink-0" onClick={() => removeOptionalEmail(email)} />
+                        </div>
+                      ))}
+                      <input 
+                        ref={optionalMailInputRef}
+                        type="text" 
+                        placeholder={clientForm.optionalMails.length === 0 ? "e.g. alternate@acme.com" : ""} 
+                        className="flex-1 min-w-[120px] outline-none border-none text-sm py-1 px-1 text-[#1e293b] font-medium bg-transparent" 
+                        value={optionalEmailInput}
+                        onChange={(e) => setOptionalEmailInput(e.target.value)}
+                        onKeyDown={handleOptionalEmailKeyDown}
+                        autoComplete="off"
+                      />
+                    </div>
+                    <p className="text-[9px] text-slate-400 mt-1">Press Enter to add multiple optional emails.</p>
                   </div>
                   <div className="flex justify-end gap-2 pt-2">
                     <Button type="button" variant="ghost" onClick={() => setClientModalOpen(false)}>
@@ -777,12 +858,12 @@ export default function ClientsPage() {
                             </TableCell>
                             <TableCell className="px-8 py-4">
                               <div className="flex flex-col gap-1">
-                                {client.secondaryMail && (
-                                  <span className="text-[10px] text-slate-500 bg-slate-50 w-fit px-2 py-0.5 rounded border border-slate-100">{client.secondaryMail}</span>
-                                )}
-                                {client.optionalMail && (
-                                  <span className="text-[10px] text-slate-500 bg-slate-50 w-fit px-2 py-0.5 rounded border border-slate-100">{client.optionalMail}</span>
-                                )}
+                                {client.secondaryMail && client.secondaryMail.split(',').map((email, i) => (
+                                  <span key={`sec-${i}`} className="text-[10px] text-slate-500 bg-slate-50 w-fit px-2 py-0.5 rounded border border-slate-100">{email.trim()}</span>
+                                ))}
+                                {client.optionalMail && client.optionalMail.split(',').map((email, i) => (
+                                  <span key={`opt-${i}`} className="text-[10px] text-slate-500 bg-slate-50 w-fit px-2 py-0.5 rounded border border-slate-100">{email.trim()}</span>
+                                ))}
                                 {!client.secondaryMail && !client.optionalMail && (
                                   <span className="text-[10px] text-slate-400 italic">None configured</span>
                                 )}

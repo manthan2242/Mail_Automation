@@ -34,11 +34,20 @@ export async function GET(
       return NextResponse.json({ error: 'Client not found' }, { status: 404 });
     }
 
-    const clientEmails = [
-      client.primaryMail?.trim().toLowerCase(),
-      client.secondaryMail?.trim().toLowerCase(),
-      client.optionalMail?.trim().toLowerCase()
-    ].filter(Boolean);
+    const clientEmails: string[] = [];
+    if (client.primaryMail) clientEmails.push(client.primaryMail.trim().toLowerCase());
+    if (client.secondaryMail) {
+      client.secondaryMail.split(',').forEach(e => {
+        const trimmed = e.trim().toLowerCase();
+        if (trimmed) clientEmails.push(trimmed);
+      });
+    }
+    if (client.optionalMail) {
+      client.optionalMail.split(',').forEach(e => {
+        const trimmed = e.trim().toLowerCase();
+        if (trimmed) clientEmails.push(trimmed);
+      });
+    }
 
     const allEmails = await prisma.email.findMany({
       include: {

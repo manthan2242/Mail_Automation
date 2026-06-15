@@ -25,23 +25,35 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    let { name, primaryMail, secondaryMail, optionalMail } = body;
+    let { name, primaryMail, secondaryMail, optionalMail, optionalMails } = body;
 
     name = name?.trim() || '';
     primaryMail = primaryMail?.trim()?.toLowerCase() || '';
-    secondaryMail = secondaryMail?.trim()?.toLowerCase() || null;
-    optionalMail = optionalMail?.trim()?.toLowerCase() || null;
 
-    if (!name || !primaryMail || !secondaryMail) {
-      return NextResponse.json({ error: 'Name, Primary Email, and Secondary Email are required' }, { status: 400 });
+    let emails: string[] = [];
+    if (Array.isArray(optionalMails)) {
+      emails = optionalMails.map((e: any) => String(e).trim().toLowerCase()).filter(Boolean);
+    } else {
+      if (secondaryMail) emails.push(secondaryMail.trim().toLowerCase());
+      if (optionalMail) {
+        optionalMail.split(',').forEach((e: string) => {
+          const trimmed = e.trim().toLowerCase();
+          if (trimmed) emails.push(trimmed);
+        });
+      }
     }
 
-    if (primaryMail === secondaryMail) {
-      return NextResponse.json({ error: 'Primary and Secondary email addresses must be different' }, { status: 400 });
+    // Ensure uniqueness of optional emails
+    const uniqueEmails = Array.from(new Set(emails));
+    const secMail = uniqueEmails[0] || null;
+    const optMail = uniqueEmails.length > 1 ? uniqueEmails.slice(1).join(', ') : null;
+
+    if (!name || !primaryMail) {
+      return NextResponse.json({ error: 'Name and Primary Email are required' }, { status: 400 });
     }
 
-    if (optionalMail && (optionalMail === primaryMail || optionalMail === secondaryMail)) {
-      return NextResponse.json({ error: 'Optional Email must be different from Primary and Secondary emails' }, { status: 400 });
+    if (uniqueEmails.includes(primaryMail)) {
+      return NextResponse.json({ error: 'Optional email addresses must be different from the Primary email address' }, { status: 400 });
     }
 
     console.log('[API] POST /api/admin/clients - Creating client:', name);
@@ -49,8 +61,8 @@ export async function POST(request: Request) {
       data: {
         name,
         primaryMail,
-        secondaryMail: secondaryMail || null,
-        optionalMail: optionalMail || null
+        secondaryMail: secMail,
+        optionalMail: optMail
       }
     });
 

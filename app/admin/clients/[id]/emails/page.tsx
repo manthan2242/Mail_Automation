@@ -171,16 +171,16 @@ export default function ClientEmailsPage({ params }: { params: Promise<{ id: str
                 <div>
                   <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Alternate Configurations</h4>
                   <div className="flex flex-wrap gap-1.5">
-                    {client.secondaryMail && (
-                      <Badge variant="outline" className="bg-slate-50 text-slate-600 border-slate-200 text-[10px] font-medium py-0.5 px-2">
-                        {client.secondaryMail}
+                    {client.secondaryMail && client.secondaryMail.split(',').map((email, idx) => (
+                      <Badge key={`sec-${idx}`} variant="outline" className="bg-slate-50 text-slate-600 border-slate-200 text-[10px] font-medium py-0.5 px-2">
+                        {email.trim()}
                       </Badge>
-                    )}
-                    {client.optionalMail && (
-                      <Badge variant="outline" className="bg-slate-50 text-slate-600 border-slate-200 text-[10px] font-medium py-0.5 px-2">
-                        {client.optionalMail}
+                    ))}
+                    {client.optionalMail && client.optionalMail.split(',').map((email, idx) => (
+                      <Badge key={`opt-${idx}`} variant="outline" className="bg-slate-50 text-slate-600 border-slate-200 text-[10px] font-medium py-0.5 px-2">
+                        {email.trim()}
                       </Badge>
-                    )}
+                    ))}
                     {!client.secondaryMail && !client.optionalMail && (
                       <span className="text-xs text-slate-400 italic">No alternate emails mapped</span>
                     )}

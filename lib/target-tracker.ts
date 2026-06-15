@@ -104,11 +104,20 @@ export async function checkAndIncrementTargets(
 
     for (const client of allClients) {
       // Collect all configured emails for this client
-      const clientEmails = [
-        client.primaryMail?.trim().toLowerCase(),
-        client.secondaryMail?.trim().toLowerCase(),
-        client.optionalMail?.trim().toLowerCase()
-      ].filter(Boolean) as string[];
+      const clientEmails: string[] = [];
+      if (client.primaryMail) clientEmails.push(client.primaryMail.trim().toLowerCase());
+      if (client.secondaryMail) {
+        client.secondaryMail.split(',').forEach(e => {
+          const trimmed = e.trim().toLowerCase();
+          if (trimmed) clientEmails.push(trimmed);
+        });
+      }
+      if (client.optionalMail) {
+        client.optionalMail.split(',').forEach(e => {
+          const trimmed = e.trim().toLowerCase();
+          if (trimmed) clientEmails.push(trimmed);
+        });
+      }
 
       console.log(`[TRACKER DEBUG] Comparing client "${client.name}": Configured client emails =`, clientEmails, `vs emailsToCheck =`, emailsToCheck);
 
