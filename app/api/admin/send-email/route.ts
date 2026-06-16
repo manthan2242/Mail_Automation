@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/db';
 import { verifyToken } from '@/lib/auth';
-import { sendEmail } from '@/lib/email';
+import { sendEmail, validateAttachments } from '@/lib/email';
 import { NextResponse } from 'next/server';
 import { checkAndIncrementTargets } from '@/lib/target-tracker';
 
@@ -16,6 +16,11 @@ export async function POST(request: Request) {
 
     const bodyData = await request.json();
     let { to, cc, bcc, subject, body, fromEmail, configId, emailId, attachments } = bodyData;
+
+    const attachmentError = validateAttachments(attachments);
+    if (attachmentError) {
+      return NextResponse.json({ error: attachmentError }, { status: 400 });
+    }
 
     // If emailId is provided, fetch the approved draft from the database
     let employeeToNotify: { email: string, name: string } | null = null;
@@ -38,6 +43,10 @@ export async function POST(request: Request) {
         }
 
         const recordAttachments = record.attachments ? JSON.parse(record.attachments) : undefined;
+        const recordAttachmentError = validateAttachments(recordAttachments);
+        if (recordAttachmentError) {
+          return NextResponse.json({ error: recordAttachmentError }, { status: 400 });
+        }
         // Send via Nodemailer with cc/bcc and attachments
         console.log(`[ADMIN MAIL] Attempting delivery to: ${to}`);
         await sendEmail(to, subject, body, {

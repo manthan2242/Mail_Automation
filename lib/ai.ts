@@ -10,24 +10,24 @@ async function runWithRetry<T>(fn: () => Promise<T>, subject: string, fallback: 
     try {
       return await fn();
     } catch (error: any) {
-      const isRetryable = error.message?.includes('high demand') || 
-                           error.message?.includes('503') || 
-                           error.message?.includes('429') ||
-                           error.status === 503 ||
-                           error.status === 429;
-      
+      const isRetryable = error.message?.includes('high demand') ||
+        error.message?.includes('503') ||
+        error.message?.includes('429') ||
+        error.status === 503 ||
+        error.status === 429;
+
       if (isRetryable && i < retries - 1) {
         const delay = Math.pow(2, i) * 1000; // 1s, 2s, 4s, 8s, 16s
         console.warn(`[AI RETRY ${i + 1}/${retries}] Model busy, retrying in ${delay}ms...`);
         await new Promise(resolve => setTimeout(resolve, delay));
         continue;
       }
-      
+
       console.error(`[AI FINAL FAILURE] After ${i + 1} attempts: ${error.message}`);
       break;
     }
   }
-  
+
   console.log(`[AI FALLBACK] Returning pre-defined template for: ${subject}`);
   return fallback;
 }
@@ -62,11 +62,11 @@ STRICT RULES:
 };
 
 export const generateAdminResponse = async (emailContent: string, action: 'approve' | 'reject' | 'info') => {
-  const fallback = action === 'approve' 
+  const fallback = action === 'approve'
     ? "I have reviewed your request and it has been approved. You may proceed."
-    : action === 'reject' 
-    ? "After careful review, your request has been declined at this time."
-    : "Your request has been received. Please provide additional supporting details.";
+    : action === 'reject'
+      ? "After careful review, your request has been declined at this time."
+      : "Your request has been received. Please provide additional supporting details.";
 
   if (!ai) return fallback;
 

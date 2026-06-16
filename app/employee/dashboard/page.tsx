@@ -1,14 +1,15 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Mail, Clock, CheckCircle, XCircle, Send, Sparkles, Briefcase, AlertCircle } from 'lucide-react';
+import { Mail, Clock, CheckCircle, XCircle, Send, Sparkles, Briefcase, AlertCircle, Camera, Loader2 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useAuth } from '@/hooks/useAuth';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import ComposeModal from '@/components/dashboard/ComposeModal';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { toast } from 'sonner';
@@ -30,7 +31,13 @@ export default function EmployeeDashboard() {
   const [assignedLoading, setAssignedLoading] = useState(true);
   const [activeSession, setActiveSession] = useState<any | null>(null);
   const [recentLogs, setRecentLogs] = useState<any[]>([]);
-  const [elapsedTime, setElapsedTime] = useState<string>('00:00:00');
+  
+  // Camera States
+  const [isCameraOpen, setIsCameraOpen] = useState(false);
+  const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
+  const [cameraLoading, setCameraLoading] = useState(false);
+  const [pendingAction, setPendingAction] = useState<'in' | 'out' | null>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -82,52 +89,119 @@ export default function EmployeeDashboard() {
     }
   }, [token]);
 
-  useEffect(() => {
-    let intervalId: any;
 
-    if (activeSession && activeSession.clockIn) {
-      const calculateElapsed = () => {
-        const diffMs = new Date().getTime() - new Date(activeSession.clockIn).getTime();
-        if (diffMs < 0) {
-          setElapsedTime('00:00:00');
-          return;
-        }
-        const diffSecs = Math.floor(diffMs / 1000);
-        const hours = Math.floor(diffSecs / 3600);
-        const minutes = Math.floor((diffSecs % 3600) / 60);
-        const seconds = diffSecs % 60;
 
-        const pad = (num: number) => String(num).padStart(2, '0');
-        setElapsedTime(`${pad(hours)}:${pad(minutes)}:${pad(seconds)}`);
-      };
-
-      calculateElapsed();
-      intervalId = setInterval(calculateElapsed, 1000);
-    } else {
-      setElapsedTime('00:00:00');
-    }
-
-    return () => {
-      if (intervalId) clearInterval(intervalId);
-    };
-  }, [activeSession]);
-
-  const handleClockToggle = async () => {
-    if (!token) return;
-    const action = activeSession ? 'out' : 'in';
+  const openCameraVerification = async (action: 'in' | 'out') => {
+    setPendingAction(action);
+    setIsCameraOpen(true);
+    setCameraLoading(true);
+    
     try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { width: 640, height: 480, facingMode: 'user' },
+        audio: false
+      });
+      setCameraStream(stream);
+      // Wait for ref to attach
+      setTimeout(() => {
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+        }
+      }, 100);
+    } catch (err) {
+      console.error("Camera access error:", err);
+      toast.error("Could not access camera. Please allow camera permissions and ensure it's not in use.");
+      setIsCameraOpen(false);
+      setPendingAction(null);
+    } finally {
+      setCameraLoading(false);
+    }
+  };
+
+  const closeCamera = () => {
+    if (cameraStream) {
+      cameraStream.getTracks().forEach(track => track.stop());
+      setCameraStream(null);
+    }
+    setIsCameraOpen(false);
+    setPendingAction(null);
+  };
+
+  const handleCaptureAndToggle = async () => {
+    if (!videoRef.current || !pendingAction || !token) return;
+    
+    try {
+      const video = videoRef.current;
+      const canvas = document.createElement('canvas');
+      canvas.width = 640;
+      canvas.height = 480;
+      const ctx = canvas.getContext('2d');
+      
+      if (!ctx) {
+        toast.error("Failed to capture verification image.");
+        return;
+      }
+      
+      // Draw frame
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      
+      // Format current timestamp
+      const now = new Date();
+      const timeStr = now.toLocaleString([], {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: true
+      });
+      
+      // Timestamp security overlay
+      ctx.font = 'bold 18px monospace';
+      const textWidth = ctx.measureText(timeStr).width;
+      const padding = 10;
+      const rectWidth = textWidth + padding * 2;
+      const rectHeight = 32;
+      
+      const x = canvas.width - rectWidth - 15;
+      const y = canvas.height - rectHeight - 15;
+      
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.65)';
+      ctx.beginPath();
+      if (ctx.roundRect) {
+        ctx.roundRect(x, y, rectWidth, rectHeight, 6);
+      } else {
+        ctx.rect(x, y, rectWidth, rectHeight);
+      }
+      ctx.fill();
+      
+      ctx.fillStyle = '#f97316'; // Security timestamp orange
+      ctx.textBaseline = 'middle';
+      ctx.fillText(timeStr, x + padding, y + rectHeight / 2);
+      
+      const base64Image = canvas.toDataURL('image/jpeg', 0.85);
+      
+      // Shut off camera
+      closeCamera();
+      
+      toast.loading('Submitting verification...', { id: 'auth-loading' });
+      
       const res = await fetch('/api/employee/attendance', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ action }),
+        body: JSON.stringify({ action: pendingAction, image: base64Image }),
       });
+      
       const data = await res.json();
+      toast.dismiss('auth-loading');
+      
       if (res.ok) {
-        toast.success(data.message || `Successfully clocked ${action}`);
-        // Refresh attendance status
+        toast.success(data.message || `Successfully clocked ${pendingAction}`);
+        // Fetch fresh attendance status
         const attendanceRes = await fetch('/api/employee/attendance', {
           headers: { Authorization: `Bearer ${token}` },
         });
@@ -140,8 +214,16 @@ export default function EmployeeDashboard() {
         toast.error(data.error || 'Failed to update attendance');
       }
     } catch (err) {
-      toast.error('Network error updating attendance');
+      toast.dismiss('auth-loading');
+      console.error(err);
+      toast.error('Network error during verification');
     }
+  };
+
+  const handleClockToggle = async () => {
+    if (!token) return;
+    const action = activeSession ? 'out' : 'in';
+    openCameraVerification(action);
   };
 
   const statCards = [
@@ -167,11 +249,6 @@ export default function EmployeeDashboard() {
                 <span className="text-xs font-semibold text-[#1e293b]">
                   {activeSession ? 'Clocked In' : 'Clocked Out'}
                 </span>
-                {activeSession && (
-                  <span className="text-xs font-mono bg-slate-100 text-[#475569] px-2 py-0.5 rounded font-semibold">
-                    {elapsedTime}
-                  </span>
-                )}
               </div>
               <Button
                 size="sm"
@@ -413,7 +490,7 @@ export default function EmployeeDashboard() {
                             "px-2 py-0.5 rounded text-[10px] font-bold",
                             isSessionActive ? "bg-emerald-50 text-emerald-600" : "bg-[#f1f5f9] text-[#64748b]"
                           )}>
-                            {isSessionActive ? elapsedTime : formatDuration(log.clockIn, log.clockOut)}
+                            {isSessionActive ? 'Active' : 'Completed'}
                           </span>
                         </div>
                       );
@@ -426,6 +503,73 @@ export default function EmployeeDashboard() {
         </div>
       </div>
       {isComposeOpen && <ComposeModal onClose={() => setIsComposeOpen(false)} />}
+
+      {/* Camera Verification Modal */}
+      <Dialog open={isCameraOpen} onOpenChange={(open) => { if (!open) closeCamera(); }}>
+        <DialogContent className="sm:max-w-[500px] bg-white rounded-[24px] border-none shadow-2xl p-0 overflow-hidden">
+          <DialogHeader className="px-8 py-6 bg-[#f8fafc] border-b border-[#e2e8f0]">
+            <DialogTitle className="text-xl font-bold text-[#1e293b] flex items-center gap-2">
+              <Camera className="w-5 h-5 text-[#6366f1]" />
+              Security Verification
+            </DialogTitle>
+            <p className="text-xs text-[#64748b] mt-1">
+              Verify your physical presence. Only a live, real-time capture from your device's camera will be accepted.
+            </p>
+          </DialogHeader>
+          <div className="p-8 space-y-6 flex flex-col items-center">
+            <div className="relative w-full h-[320px] rounded-2xl overflow-hidden border border-[#e2e8f0] bg-slate-950 flex items-center justify-center group shadow-inner">
+              {/* Webcam Video Stream */}
+              <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                muted
+                className="w-full h-full object-cover"
+              />
+              
+              {/* CCTV Style Scanner Bar Overlay */}
+              {cameraStream && (
+                <div className="absolute inset-0 pointer-events-none border-2 border-dashed border-[#6366f1]/30 rounded-2xl">
+                  <motion.div
+                    className="w-full h-[2px] bg-[#6366f1] opacity-75 shadow-[0_0_8px_#6366f1] absolute left-0"
+                    animate={{ top: ['0%', '98%', '0%'] }}
+                    transition={{ repeat: Infinity, duration: 3, ease: 'linear' }}
+                  />
+                  <div className="absolute top-4 left-4 font-mono text-[10px] text-emerald-400 bg-black/50 px-2 py-1 rounded select-none flex items-center gap-1.5 shadow-sm">
+                    <span className="w-2 h-2 bg-emerald-500 rounded-full animate-ping" />
+                    LIVE FEED
+                  </div>
+                </div>
+              )}
+
+              {cameraLoading && (
+                <div className="absolute inset-0 bg-slate-900/90 flex flex-col items-center justify-center text-white gap-3 rounded-2xl">
+                  <Loader2 className="w-8 h-8 text-[#6366f1] animate-spin" />
+                  <p className="text-xs font-semibold tracking-wide text-slate-300">Initializing Camera...</p>
+                </div>
+              )}
+            </div>
+
+            <div className="flex w-full gap-3">
+              <Button
+                variant="outline"
+                onClick={closeCamera}
+                className="flex-1 rounded-xl py-6 font-semibold border-slate-200 hover:bg-slate-50 transition-colors text-slate-700"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleCaptureAndToggle}
+                disabled={cameraLoading || !cameraStream}
+                className="flex-1 bg-[#6366f1] hover:bg-[#4f46e5] text-white rounded-xl py-6 font-bold shadow-sm shadow-indigo-100 flex items-center justify-center gap-2"
+              >
+                <Camera className="w-4 h-4" />
+                Capture & {pendingAction === 'in' ? 'Clock In' : 'Clock Out'}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
   );
 }
@@ -433,21 +577,6 @@ export default function EmployeeDashboard() {
 function cn(...inputs: any[]) {
   return inputs.filter(Boolean).join(' ');
 }
-
-const formatDuration = (start: string, end: string | null) => {
-  if (!start) return '-';
-  const startTime = new Date(start).getTime();
-  const endTime = end ? new Date(end).getTime() : new Date().getTime();
-  const diffMs = endTime - startTime;
-  if (diffMs < 0) return '0m';
-  const diffMins = Math.floor(diffMs / 60000);
-  const hrs = Math.floor(diffMins / 60);
-  const mins = diffMins % 60;
-  if (hrs > 0) {
-    return `${hrs}h ${mins}m`;
-  }
-  return `${mins}m`;
-};
 
 const formatTime = (dateStr: string) => {
   return new Date(dateStr).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });

@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
-import { Plus, Search, UserPlus, Trash2, Edit, ShieldCheck, Mail as MailIcon, Settings, CheckCircle, Briefcase, Clock } from 'lucide-react';
+import { Plus, Search, UserPlus, Trash2, Edit, ShieldCheck, Mail as MailIcon, Settings, CheckCircle, Briefcase, Clock, Camera, Calendar } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
 import { motion } from 'motion/react';
@@ -138,6 +138,49 @@ export default function EmployeesPage() {
   const [isAttendanceOpen, setIsAttendanceOpen] = useState(false);
   const [attendanceLogs, setAttendanceLogs] = useState<any[]>([]);
   const [attendanceLoading, setAttendanceLoading] = useState(false);
+
+  // Verification & Daily Attendance Log States
+  const [previewImage, setPreviewImage] = useState<{ src: string; title: string } | null>(null);
+  const [isDailyLogOpen, setIsDailyLogOpen] = useState(false);
+  const [dailyLogDate, setDailyLogDate] = useState<string>(() => {
+    const today = new Date();
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, '0');
+    const dd = String(today.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  });
+  const [dailyLogs, setDailyLogs] = useState<any[]>([]);
+  const [dailyLoading, setDailyLoading] = useState(false);
+
+  const fetchDailyLogs = async (dateStr: string) => {
+    if (!token) return;
+    setDailyLoading(true);
+    try {
+      const localDate = new Date(dateStr);
+      const start = new Date(localDate.getFullYear(), localDate.getMonth(), localDate.getDate(), 0, 0, 0, 0);
+      const end = new Date(localDate.getFullYear(), localDate.getMonth(), localDate.getDate(), 23, 59, 59, 999);
+      
+      const res = await fetch(`/api/admin/employees/attendance?startDate=${start.toISOString()}&endDate=${end.toISOString()}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setDailyLogs(data);
+      } else {
+        toast.error(data.error || 'Failed to load daily attendance logs');
+      }
+    } catch (err) {
+      toast.error('Failed to load daily attendance logs');
+    } finally {
+      setDailyLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (isDailyLogOpen && token && dailyLogDate) {
+      fetchDailyLogs(dailyLogDate);
+    }
+  }, [isDailyLogOpen, dailyLogDate, token]);
 
   const [isGlobalProjectAssignOpen, setIsGlobalProjectAssignOpen] = useState(false);
   const [globalSelectedEmployeeId, setGlobalSelectedEmployeeId] = useState<string>('');
@@ -344,6 +387,14 @@ export default function EmployeesPage() {
             <p className="text-[#64748b] mt-1">Manage your team members and their access.</p>
           </div>
           <div className="flex gap-2 flex-wrap">
+            <Button 
+              onClick={() => setIsDailyLogOpen(true)}
+              className="bg-white hover:bg-slate-50 text-[#1e293b] border border-[#e2e8f0] rounded-lg px-5 h-10 font-semibold shadow-sm"
+            >
+              <Calendar className="w-4 h-4 mr-2 text-indigo-500" />
+              Attendance Log
+            </Button>
+
             <Button 
               onClick={() => setIsGlobalProjectAssignOpen(true)}
               className="bg-white hover:bg-slate-50 text-[#1e293b] border border-[#e2e8f0] rounded-lg px-5 h-10 font-semibold shadow-sm"
@@ -746,7 +797,6 @@ export default function EmployeesPage() {
                       <TableHead className="px-4 py-3 text-[10px] font-bold text-[#64748b] uppercase tracking-wider">Date</TableHead>
                       <TableHead className="px-4 py-3 text-[10px] font-bold text-[#64748b] uppercase tracking-wider">Clock In</TableHead>
                       <TableHead className="px-4 py-3 text-[10px] font-bold text-[#64748b] uppercase tracking-wider">Clock Out</TableHead>
-                      <TableHead className="px-4 py-3 text-[10px] font-bold text-[#64748b] uppercase tracking-wider">Duration</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -754,34 +804,43 @@ export default function EmployeesPage() {
                       const clockInDate = new Date(log.clockIn);
                       const clockOutDate = log.clockOut ? new Date(log.clockOut) : null;
                       
-                      // Duration calculation
-                      let durationStr = '-';
-                      if (clockOutDate) {
-                        const diffMs = clockOutDate.getTime() - clockInDate.getTime();
-                        const diffMins = Math.floor(diffMs / 60000);
-                        const hrs = Math.floor(diffMins / 60);
-                        const mins = diffMins % 60;
-                        durationStr = hrs > 0 ? `${hrs}h ${mins}m` : `${mins}m`;
-                      } else {
-                        durationStr = 'Active';
-                      }
-
                       return (
                         <TableRow key={log.id} className="hover:bg-slate-50/50 border-b border-[#e2e8f0]">
                           <TableCell className="px-4 py-3 text-xs font-semibold text-[#1e293b]">
                             {clockInDate.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}
                           </TableCell>
                           <TableCell className="px-4 py-3 text-xs text-[#64748b]">
-                            {clockInDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            <div className="flex items-center gap-2">
+                              <span>{clockInDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                              {log.clockInImage && (
+                                <button
+                                  onClick={() => setPreviewImage({ src: log.clockInImage, title: `${selectedEmployee?.name} - Clock In Photo` })}
+                                  className="p-1 hover:bg-slate-100 hover:text-[#6366f1] rounded border border-transparent hover:border-slate-200 transition-colors"
+                                  title="View Clock In Photo"
+                                >
+                                  <Camera className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                            </div>
                           </TableCell>
                           <TableCell className="px-4 py-3 text-xs text-[#64748b]">
-                            {clockOutDate 
-                              ? clockOutDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                              : <span className="text-emerald-600 font-bold animate-pulse">Active Session</span>
-                            }
-                          </TableCell>
-                          <TableCell className="px-4 py-3 text-xs font-medium text-[#1e293b]">
-                            {durationStr}
+                            <div className="flex items-center gap-2">
+                              <span>
+                                {clockOutDate 
+                                  ? clockOutDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                                  : <span className="text-emerald-600 font-bold animate-pulse">Active Session</span>
+                                }
+                              </span>
+                              {log.clockOutImage && (
+                                <button
+                                  onClick={() => setPreviewImage({ src: log.clockOutImage, title: `${selectedEmployee?.name} - Clock Out Photo` })}
+                                  className="p-1 hover:bg-slate-100 hover:text-[#6366f1] rounded border border-transparent hover:border-slate-200 transition-colors"
+                                  title="View Clock Out Photo"
+                                >
+                                  <Camera className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                            </div>
                           </TableCell>
                         </TableRow>
                       );
@@ -908,6 +967,144 @@ export default function EmployeesPage() {
 
             <Button onClick={handleCloseGlobalAssign} className="w-full bg-[#1e293b] text-white rounded-xl py-6 mt-4">
               Close
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Daily Attendance Log Modal */}
+      <Dialog open={isDailyLogOpen} onOpenChange={setIsDailyLogOpen}>
+        <DialogContent className="sm:max-w-[700px] w-[95vw] bg-white rounded-[24px] border-none shadow-2xl p-0 overflow-hidden">
+          <DialogHeader className="px-8 py-6 bg-[#f8fafc] border-b border-[#e2e8f0]">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <DialogTitle className="text-xl font-bold text-[#1e293b]">Daily Attendance Log</DialogTitle>
+                <p className="text-xs text-[#64748b] mt-1">Select a date to view presence status and live verification photos.</p>
+              </div>
+              <div className="flex items-center gap-2 self-start sm:self-center">
+                <Calendar className="w-4 h-4 text-[#6366f1]" />
+                <Input
+                  type="date"
+                  value={dailyLogDate}
+                  onChange={(e) => setDailyLogDate(e.target.value)}
+                  className="w-36 rounded-lg border-[#e2e8f0] text-xs h-9 bg-white"
+                />
+              </div>
+            </div>
+          </DialogHeader>
+          <div className="p-8 space-y-4">
+            {dailyLoading ? (
+              <p className="text-center py-12 text-[#64748b]">Loading team logs...</p>
+            ) : dailyLogs.length === 0 ? (
+              <p className="text-center py-12 text-[#64748b]">No employees found.</p>
+            ) : (
+              <div className="max-h-[400px] overflow-y-auto pr-1">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-[#fafafa] hover:bg-[#fafafa]">
+                      <TableHead className="px-4 py-3 text-[10px] font-bold text-[#64748b] uppercase tracking-wider">Team Member</TableHead>
+                      <TableHead className="px-4 py-3 text-[10px] font-bold text-[#64748b] uppercase tracking-wider">Status</TableHead>
+                      <TableHead className="px-4 py-3 text-[10px] font-bold text-[#64748b] uppercase tracking-wider">Clock In</TableHead>
+                      <TableHead className="px-4 py-3 text-[10px] font-bold text-[#64748b] uppercase tracking-wider">Clock Out</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {dailyLogs.map((employee) => {
+                      const log = employee.attendanceLogs?.[0]; // Single log per employee per day
+                      const isPresent = !!log;
+                      
+                      const clockInDate = log ? new Date(log.clockIn) : null;
+                      const clockOutDate = log?.clockOut ? new Date(log.clockOut) : null;
+
+                      return (
+                        <TableRow key={employee.id} className="hover:bg-slate-50/50 border-b border-[#e2e8f0]">
+                          <TableCell className="px-4 py-3 text-xs">
+                            <div>
+                              <p className="font-semibold text-[#1e293b]">{employee.name}</p>
+                              <p className="text-[10px] text-[#64748b]">@{employee.username}</p>
+                            </div>
+                          </TableCell>
+                          <TableCell className="px-4 py-3 text-xs">
+                            <span className={cn(
+                              "px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider",
+                              isPresent ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-rose-600"
+                            )}>
+                              {isPresent ? 'Present' : 'Absent'}
+                            </span>
+                          </TableCell>
+                          <TableCell className="px-4 py-3 text-xs text-[#64748b]">
+                            {clockInDate ? (
+                              <div className="flex items-center gap-2">
+                                <span>{clockInDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                {log.clockInImage && (
+                                  <button
+                                    onClick={() => setPreviewImage({ src: log.clockInImage, title: `${employee.name} - Clock In Photo` })}
+                                    className="p-1 hover:bg-slate-100 hover:text-[#6366f1] rounded border border-transparent hover:border-slate-200 transition-colors"
+                                    title="View Clock In Photo"
+                                  >
+                                    <Camera className="w-3.5 h-3.5" />
+                                  </button>
+                                )}
+                              </div>
+                            ) : (
+                              <span>-</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="px-4 py-3 text-xs text-[#64748b]">
+                            {isPresent ? (
+                              clockOutDate ? (
+                                <div className="flex items-center gap-2">
+                                  <span>{clockOutDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                  {log.clockOutImage && (
+                                    <button
+                                      onClick={() => setPreviewImage({ src: log.clockOutImage, title: `${employee.name} - Clock Out Photo` })}
+                                      className="p-1 hover:bg-slate-100 hover:text-[#6366f1] rounded border border-transparent hover:border-slate-200 transition-colors"
+                                      title="View Clock Out Photo"
+                                    >
+                                      <Camera className="w-3.5 h-3.5" />
+                                    </button>
+                                  )}
+                                </div>
+                              ) : (
+                                <span className="text-emerald-600 font-bold animate-pulse">Active Session</span>
+                              )
+                            ) : (
+                              <span>-</span>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+            <Button onClick={() => setIsDailyLogOpen(false)} className="w-full bg-[#1e293b] text-white rounded-xl py-6 mt-4">
+              Close
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Image Preview Modal */}
+      <Dialog open={!!previewImage} onOpenChange={(open) => { if (!open) setPreviewImage(null); }}>
+        <DialogContent className="sm:max-w-[480px] w-[90vw] bg-white rounded-[24px] border-none shadow-2xl p-0 overflow-hidden z-[250]">
+          <DialogHeader className="px-8 py-6 bg-[#f8fafc] border-b border-[#e2e8f0]">
+            <DialogTitle className="text-lg font-bold text-[#1e293b]">{previewImage?.title}</DialogTitle>
+          </DialogHeader>
+          <div className="p-8 flex flex-col items-center">
+            {previewImage && (
+              <div className="relative w-full rounded-2xl overflow-hidden border border-slate-200 bg-slate-950 shadow-lg">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img 
+                  src={previewImage.src} 
+                  alt="Verification" 
+                  className="w-full h-auto object-contain max-h-[360px]"
+                />
+              </div>
+            )}
+            <Button onClick={() => setPreviewImage(null)} className="w-full bg-[#1e293b] text-white rounded-xl py-6 mt-6 font-semibold">
+              Close Preview
             </Button>
           </div>
         </DialogContent>

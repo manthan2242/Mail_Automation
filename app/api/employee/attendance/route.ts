@@ -49,7 +49,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    const { action } = await request.json();
+    const { action, image } = await request.json();
     if (action !== 'in' && action !== 'out') {
       return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
     }
@@ -66,10 +66,15 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'Already clocked in', activeSession }, { status: 400 });
       }
 
+      if (!image) {
+        return NextResponse.json({ error: 'Live verification photo is required to clock in.' }, { status: 400 });
+      }
+
       const newLog = await prisma.attendanceLog.create({
         data: {
           employeeId: payload.id,
           clockIn: new Date(),
+          clockInImage: image,
         },
       });
 
@@ -79,9 +84,16 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'Not clocked in' }, { status: 400 });
       }
 
+      if (!image) {
+        return NextResponse.json({ error: 'Live verification photo is required to clock out.' }, { status: 400 });
+      }
+
       const updatedLog = await prisma.attendanceLog.update({
         where: { id: activeSession.id },
-        data: { clockOut: new Date() },
+        data: {
+          clockOut: new Date(),
+          clockOutImage: image,
+        },
       });
 
       return NextResponse.json({ message: 'Clocked out successfully', session: updatedLog });

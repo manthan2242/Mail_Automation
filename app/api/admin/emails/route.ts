@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/db';
 import { NextResponse } from 'next/server';
-import { sendEmail } from '@/lib/email';
+import { sendEmail, validateAttachments } from '@/lib/email';
 import { checkAndIncrementTargets } from '@/lib/target-tracker';
 
 export async function GET() {
@@ -66,6 +66,11 @@ export async function PATCH(request: Request) {
       const resolvedBcc = bcc !== undefined ? bcc : emailData.bcc;
       
       const attachments = emailData.attachments ? JSON.parse(emailData.attachments) : undefined;
+
+      const attachmentError = validateAttachments(attachments);
+      if (attachmentError) {
+        return NextResponse.json({ error: attachmentError }, { status: 400 });
+      }
 
       if (!resolvedTo || !resolvedSubject || !resolvedBody) {
         throw new Error('Missing recipient, subject, or body for email delivery.');

@@ -191,11 +191,13 @@ model Target {
 }
 
 model AttendanceLog {
-  id          String    @id @default(uuid())
-  employeeId  String
-  employee    Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-  clockIn     DateTime  @default(now())
-  clockOut    DateTime?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id             String    @id @default(uuid())
+  employeeId     String
+  employee       Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  clockIn        DateTime  @default(now())
+  clockOut       DateTime?
+  clockInImage   String?
+  clockOutImage  String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 }

@@ -34,7 +34,7 @@ export default function ChangePasswordPage() {
       });
       if (res.ok) {
         toast.success('Password changed successfully');
-        router.push('/auth/verify-otp');
+        router.push('/employee/dashboard');
       } else {
         const data = await res.json();
         toast.error(data.error);

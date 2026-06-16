@@ -184,7 +184,32 @@ export default function ComposeModal({ onClose }: { onClose: () => void }) {
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) setAttachments([...attachments, ...Array.from(e.target.files)]);
+    if (!e.target.files) return;
+    const selectedFiles = Array.from(e.target.files);
+    const validFiles: File[] = [];
+    const blockedExtensions = ['.exe', '.scr', '.bat', '.sh', '.vbs', '.cmd', '.msi', '.com', '.pif'];
+    const maxSizeBytes = 5 * 1024 * 1024; // 5MB
+
+    for (const file of selectedFiles) {
+      const dotIndex = file.name.lastIndexOf('.');
+      const ext = dotIndex !== -1 ? file.name.slice(dotIndex).toLowerCase() : '';
+      
+      if (blockedExtensions.includes(ext)) {
+        toast.error(`File "${file.name}" rejected: type "${ext}" is blocked for security reasons.`);
+        continue;
+      }
+      
+      if (file.size > maxSizeBytes) {
+        toast.error(`File "${file.name}" rejected: exceeds the maximum size limit of 5MB.`);
+        continue;
+      }
+      
+      validFiles.push(file);
+    }
+
+    if (validFiles.length > 0) {
+      setAttachments([...attachments, ...validFiles]);
+    }
   };
 
   const removeAttachment = (idx: number) => {
@@ -282,11 +307,21 @@ export default function ComposeModal({ onClose }: { onClose: () => void }) {
         toast.success(isAdmin ? 'Email sent!' : 'Email submitted for approval!');
         onClose();
       } else {
-        const data = await res.json();
-        toast.error(data.error);
+        let errMsg = 'Failed to send';
+        try {
+          const data = await res.json();
+          errMsg = data.error || errMsg;
+        } catch (e) {
+          if (res.status === 413) {
+            errMsg = 'Attachment payload too large. Please reduce file size.';
+          } else {
+            errMsg = `Server error (${res.status}): Failed to send`;
+          }
+        }
+        toast.error(errMsg);
       }
-    } catch (error) {
-      toast.error('Failed to send');
+    } catch (error: any) {
+      toast.error(error?.message || 'Failed to send');
     } finally {
       setSending(false);
     }

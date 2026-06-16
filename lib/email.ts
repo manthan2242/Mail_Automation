@@ -87,7 +87,7 @@ export const sendEmail = async (
     console.log(`[SMTP CACHE HIT]: Reusing active SMTP transporter connection pool for ${user}`);
   }
 
-  const fromEmail = opts.replyTo || process.env.FROM_EMAIL || user;
+  const fromEmail = opts.replyTo || (opts.emailConfigId && opts.emailConfigId !== 'default' ? user : (process.env.FROM_EMAIL || user));
   
   // Convert arrays to comma-separated strings for nodemailer
   const toStr = Array.isArray(to) ? to.join(', ') : to;
@@ -113,8 +113,9 @@ export const sendEmail = async (
     };
   });
 
+  const appName = process.env.NEXT_PUBLIC_APP_NAME || 'Sales Force Pro';
   const mailOptions: nodemailer.SendMailOptions = {
-    from: `"Mail Automation" <${fromEmail}>`,
+    from: `"${appName}" <${fromEmail}>`,
     to: toStr,
     ...(ccStr && { cc: ccStr }),
     subject,

@@ -17,6 +17,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { motion } from 'motion/react';
 import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
+import ComposeModal from '@/components/dashboard/ComposeModal';
 
 interface Email {
   id: string;
@@ -70,9 +71,7 @@ export default function EmailMonitoringPage() {
   const [isComposeOpen, setIsComposeOpen] = useState(false);
   const [isEditDraftOpen, setIsEditDraftOpen] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
-  const [genLoading, setGenLoading] = useState(false);
   const [sendLoading, setSendLoading] = useState(false);
-  const [composeData, setComposeData] = useState({ subject: '', body: '', to: '' });
   const [editDraftData, setEditDraftData] = useState({ subject: '', body: '', to: '', cc: '', bcc: '' });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { token } = useAuth();
@@ -306,81 +305,7 @@ export default function EmailMonitoringPage() {
     }
   };
 
-  const handleGenerateBody = async () => {
-    const sourceEmail = selectedFromEmail === 'default' ? 'default' : configs.find(c => c.id === selectedFromEmail)?.email;
-    if (!sourceEmail) {
-      toast.error("Please select a 'From' email address");
-      return;
-    }
-    if (!composeData.subject) {
-      toast.error('Please enter a subject first');
-      return;
-    }
-    setGenLoading(true);
-    try {
-      const res = await fetch('/api/employee/generate-email', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({ 
-          subject: composeData.subject,
-          sourceEmail: sourceEmail
-        }),
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setComposeData(prev => ({ ...prev, body: data.body }));
-        toast.success('Email body generated');
-      } else {
-        toast.error(data.error || "Source email is required");
-      }
-    } catch (error) {
-      toast.error('Failed to generate email');
-    } finally {
-      setGenLoading(false);
-    }
-  };
 
-  const handleSendCompose = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const sourceEmail = selectedFromEmail;
-    if (!sourceEmail) {
-      toast.error("Please select a 'From' email address");
-      return;
-    }
-    setIsSubmitting(true);
-    try {
-      const res = await fetch('/api/employee/send-email', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({ 
-          recipientEmail: composeData.to,
-          subject: composeData.subject,
-          body: composeData.body,
-          sourceEmail: selectedFromEmail === 'default' ? undefined : configs.find(c => c.id === selectedFromEmail)?.email,
-          configId: selectedFromEmail === 'default' ? undefined : selectedFromEmail
-        }),
-      });
-      if (res.ok) {
-        toast.success('Email sent successfully');
-        setIsComposeOpen(false);
-        setComposeData({ subject: '', body: '', to: '' });
-        fetchData();
-      } else {
-        const data = await res.json();
-        toast.error(data.error || 'Failed to send email');
-      }
-    } catch (error) {
-      toast.error('An error occurred');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -404,86 +329,13 @@ export default function EmailMonitoringPage() {
             <Button variant="outline" onClick={fetchData} className="bg-white border-[#e2e8f0] text-[#1e293b] rounded-lg px-5 h-10 font-semibold shadow-sm hover:bg-slate-50">
               Refresh
             </Button>
-            <Dialog open={isComposeOpen} onOpenChange={setIsComposeOpen}>
-              <DialogTrigger
-                render={
-                  <Button className="bg-[#6366f1] hover:bg-[#4f46e5] text-white rounded-lg px-5 h-10 font-semibold shadow-sm shadow-indigo-100">
-                    <Send className="w-4 h-4 mr-2" />
-                    Compose
-                  </Button>
-                }
-              />
-              <DialogContent className="sm:max-w-[600px] bg-white rounded-[24px] border-none shadow-2xl p-0 overflow-hidden">
-                <DialogHeader className="px-8 py-6 bg-[#f8fafc] border-b border-[#e2e8f0]">
-                  <DialogTitle className="text-xl font-bold text-[#1e293b]">Compose New Email</DialogTitle>
-                </DialogHeader>
-                <form onSubmit={handleSendCompose} className="p-8 space-y-6">
-                  <div className="space-y-2">
-                    <Label className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider">Recipient Email</Label>
-                    <Input 
-                      placeholder="client@example.com" 
-                      value={composeData.to}
-                      onChange={(e) => setComposeData({...composeData, to: e.target.value})}
-                      className="rounded-xl border-[#e2e8f0]"
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider">Email Subject</Label>
-                    <div className="flex gap-2">
-                      <Input 
-                        placeholder="Meeting Request" 
-                        value={composeData.subject}
-                        onChange={(e) => setComposeData({...composeData, subject: e.target.value})}
-                        className="rounded-xl border-[#e2e8f0]"
-                        required
-                      />
-                      <Button 
-                        type="button"
-                        onClick={handleGenerateBody} 
-                        disabled={genLoading || !composeData.subject}
-                        className={cn(
-                          "rounded-xl px-4 whitespace-nowrap transition-all",
-                          !composeData.subject 
-                            ? "bg-slate-100 text-slate-400 cursor-not-allowed" 
-                            : "bg-indigo-50 text-indigo-600 hover:bg-indigo-100 border border-indigo-100"
-                        )}
-                      >
-                        {genLoading ? '...' : <><Sparkles className="w-4 h-4 mr-2" /> Generate Body</>}
-                      </Button>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider">Email Body</Label>
-                    <Textarea 
-                      placeholder="Email content..." 
-                      value={composeData.body}
-                      onChange={(e) => setComposeData({...composeData, body: e.target.value})}
-                      className="min-h-[200px] rounded-xl border-[#e2e8f0]"
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider">Send From</Label>
-                    <Select onValueChange={(val) => setSelectedFromEmail(val || '')} value={selectedFromEmail}>
-                      <SelectTrigger className="w-full rounded-2xl border-[#e2e8f0] h-12 bg-[#f8fafc] text-[#64748b] font-medium shadow-none focus:ring-[#6366f1] px-4">
-                        <SelectValue placeholder="Select sender email" />
-                      </SelectTrigger>
-                      <SelectContent className="bg-white rounded-xl">
-                        <SelectItem value="default">Default SMTP (.env)</SelectItem>
-                        {configs.map(config => (
-                          <SelectItem key={config.id} value={config.id}>{config.email}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <Button type="submit" disabled={isSubmitting} className="w-full bg-[#6366f1] hover:bg-[#4f46e5] text-white rounded-xl py-6 font-bold shadow-lg shadow-indigo-100">
-                    {isSubmitting ? 'Sending...' : 'Send Email'}
-                  </Button>
-                </form>
-              </DialogContent>
-            </Dialog>
+            <Button 
+              onClick={() => setIsComposeOpen(true)}
+              className="bg-[#6366f1] hover:bg-[#4f46e5] text-white rounded-lg px-5 h-10 font-semibold shadow-sm shadow-indigo-100"
+            >
+              <Send className="w-4 h-4 mr-2" />
+              Compose
+            </Button>
           </div>
         </header>
 
@@ -1123,6 +975,7 @@ export default function EmailMonitoringPage() {
           </form>
         </DialogContent>
       </Dialog>
+      {isComposeOpen && <ComposeModal onClose={() => { setIsComposeOpen(false); fetchData(); }} />}
     </DashboardLayout>
   );
 }
