@@ -2,6 +2,7 @@ import { prisma } from '@/lib/db';
 import { NextResponse } from 'next/server';
 import { sendEmail, validateAttachments } from '@/lib/email';
 import { checkAndIncrementTargets } from '@/lib/target-tracker';
+import { verifyToken } from '@/lib/auth';
 
 export async function GET() {
   try {
@@ -40,6 +41,23 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: 'Email not found' }, { status: 404 });
     }
 
+    const token = request.headers.get('authorization')?.split(' ')[1];
+    let adminName: string | undefined;
+    let adminId: string | undefined;
+    if (token) {
+      const payload = await verifyToken(token);
+      if (payload && payload.role === 'admin') {
+        adminId = payload.id;
+        const admin = await prisma.admin.findUnique({
+          where: { id: payload.id },
+          select: { name: true }
+        });
+        if (admin) {
+          adminName = admin.name;
+        }
+      }
+    }
+
     const isApproved = status === 'APPROVED';
     const targetStatus = isApproved ? 'SENT' : status;
 
@@ -49,6 +67,7 @@ export async function PATCH(request: Request) {
       data: { 
         status: targetStatus, 
         adminComment,
+        adminSenderId: adminId || undefined,
         ...(subject && { subject }),
         ...(body && { body }),
         ...(to !== undefined && { to }),
@@ -57,7 +76,7 @@ export async function PATCH(request: Request) {
       },
     });
 
-    // If approved, send the email immediately via Nodemailer and track targets
+    // If approved, send the email immediately via Nodemailer and track targets (asynchronously)
     if (isApproved) {
       const resolvedTo = to || emailData.to;
       const resolvedSubject = subject || emailData.subject;
@@ -77,19 +96,34 @@ export async function PATCH(request: Request) {
       }
 
       console.log(`[AUTO-SEND] Approving and sending email to: ${resolvedTo}`);
-      await sendEmail(resolvedTo, resolvedSubject, resolvedBody, {
+      
+      sendEmail(resolvedTo, resolvedSubject, resolvedBody, {
         replyTo: emailData.fromEmail || undefined,
         emailConfigId: emailData.configId || undefined,
         noBcc: false,
         cc: resolvedCc || undefined,
         bcc: resolvedBcc || undefined,
-        attachments: attachments
-      });
-      console.log('[AUTO-SEND] Nodemailer dispatch success.');
-
-      // Trigger target validation and progression checks (asynchronously)
-      checkAndIncrementTargets(resolvedTo, resolvedSubject, resolvedCc, resolvedBcc).catch(trackerErr => {
-        console.error('[TRACKER TRACE ERROR]:', trackerErr);
+        attachments: attachments,
+        senderName: adminName
+      }).then(() => {
+        console.log('[AUTO-SEND] Nodemailer dispatch success.');
+        // Trigger target validation and progression checks (asynchronously)
+        checkAndIncrementTargets(resolvedTo, resolvedSubject, resolvedCc, resolvedBcc).catch(trackerErr => {
+          console.error('[TRACKER TRACE ERROR]:', trackerErr);
+        });
+      }).catch(async (sendErr: any) => {
+        console.error('[AUTO-SEND ERROR] Background email sending failed:', sendErr.message);
+        try {
+          await prisma.email.update({
+            where: { id },
+            data: { 
+              status: 'FAILED',
+              adminComment: adminComment ? `${adminComment} (Send error: ${sendErr.message})` : `Send error: ${sendErr.message}`
+            }
+          });
+        } catch (dbErr) {
+          console.error('[AUTO-SEND DATABASE ERROR]: Failed to mark email status as FAILED', dbErr);
+        }
       });
     }
 
@@ -100,7 +134,7 @@ export async function PATCH(request: Request) {
         `Request ${isApproved ? 'Approved & Sent' : 'Rejected'}: ${updatedEmail.subject}`,
         `Hi ${emailData.employee.name},\n\nYour request for "${updatedEmail.subject}" has been ${isApproved ? 'approved and sent' : 'rejected'}.${adminComment ? `\n\nAdmin Note: ${adminComment}` : ''}`,
         { noBcc: true }
-      ).catch((e) => {
+      ).catch((e: any) => {
         console.warn('[NOTIFY ERROR]: Status notification failed', e);
       });
     }

@@ -14,6 +14,7 @@ import { motion } from 'motion/react';
 
 interface EmailConfig {
   id: string;
+  name: string;
   host: string;
   port: number;
   email: string;
@@ -25,7 +26,7 @@ export default function EmailConfigsPage() {
   const [loading, setLoading] = useState(true);
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
-  const [newConfig, setNewConfig] = useState({ host: '', port: '587', email: '', password: '' });
+  const [newConfig, setNewConfig] = useState({ name: '', host: '', port: '587', email: '', password: '' });
   const [editingConfig, setEditingConfig] = useState<any>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { token } = useAuth();
@@ -64,7 +65,7 @@ export default function EmailConfigsPage() {
       if (res.ok) {
         toast.success('SMTP Configuration added');
         setIsAddOpen(false);
-        setNewConfig({ host: '', port: '587', email: '', password: '' });
+        setNewConfig({ name: '', host: '', port: '587', email: '', password: '' });
         fetchConfigs();
       } else {
         toast.error(data.error);
@@ -149,6 +150,17 @@ export default function EmailConfigsPage() {
               </DialogHeader>
               <form onSubmit={handleAdd} className="p-8 space-y-6">
                 <div className="space-y-2">
+                  <Label htmlFor="name" className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider">SMTP Name</Label>
+                  <Input 
+                    id="name" 
+                    placeholder="e.g. Sales Team or Admin Name" 
+                    value={newConfig.name}
+                    onChange={(e) => setNewConfig({...newConfig, name: e.target.value})}
+                    className="rounded-xl border-[#e2e8f0] focus:ring-[#6366f1]"
+                    required 
+                  />
+                </div>
+                <div className="space-y-2">
                   <Label htmlFor="host" className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider">SMTP Host</Label>
                   <Input 
                     id="host" 
@@ -208,6 +220,16 @@ export default function EmailConfigsPage() {
                 <DialogTitle className="text-xl font-bold text-[#1e293b]">Edit SMTP Server</DialogTitle>
               </DialogHeader>
               <form onSubmit={handleUpdate} className="p-8 space-y-6">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-name" className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider">SMTP Name</Label>
+                  <Input 
+                    id="edit-name" 
+                    value={editingConfig?.name || ''}
+                    onChange={(e) => setEditingConfig({...editingConfig, name: e.target.value})}
+                    className="rounded-xl border-[#e2e8f0] focus:ring-[#6366f1]"
+                    required 
+                  />
+                </div>
                 <div className="space-y-2">
                   <Label htmlFor="edit-host" className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider">SMTP Host</Label>
                   <Input 
@@ -299,7 +321,8 @@ export default function EmailConfigsPage() {
                         </Button>
                       </div>
                     </div>
-                    <CardTitle className="text-sm md:text-lg font-bold text-[#1e293b] mt-3 md:mt-5 truncate">{config.email}</CardTitle>
+                    <CardTitle className="text-sm md:text-lg font-bold text-[#1e293b] mt-3 md:mt-5 truncate">{config.name}</CardTitle>
+                    <div className="text-xs font-semibold text-[#64748b] truncate mt-1">{config.email}</div>
                   </CardHeader>
                   <CardContent className="p-4 md:p-8 space-y-3 md:space-y-5">
                     <div className="flex items-center text-xs md:text-sm text-[#64748b]">

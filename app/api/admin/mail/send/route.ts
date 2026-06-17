@@ -14,6 +14,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const admin = await prisma.admin.findUnique({
+      where: { id: payload.id },
+      select: { name: true }
+    });
+    const adminName = admin?.name;
+
     const { to, cc, bcc, subject, body, status, configId } = await request.json();
 
     // Validate TO field
@@ -43,23 +49,36 @@ export async function POST(request: Request) {
         status: status || 'SENT'
       }
     });
-    console.log(`[MAIL TOOL] Saved to DB with ID: ${historyItem.id}`);
+    const historyId = historyItem.id;
+    console.log(`[MAIL TOOL] Saved to DB with ID: ${historyId}`);
 
-    // Step 2: Send real email via Nodemailer (if not a draft)
+    // Step 2: Send real email via Nodemailer (if not a draft) (asynchronously)
     if (status !== 'DRAFT') {
       console.log(`[MAIL TOOL] Attempting real Nodemailer delivery to: ${to.join(', ')}`);
-      await sendEmail(to, subject, body, { cc: cc || [], bcc: bcc || [] }, configId);
-      console.log('[MAIL TOOL] Success: Email sent successfully');
-
-      // Trigger target validation and progression checks (asynchronously)
-      checkAndIncrementTargets(
-        to.join(', '),
-        subject,
-        cc && cc.length > 0 ? cc.join(', ') : undefined,
-        bcc && bcc.length > 0 ? bcc.join(', ') : undefined
-      ).catch(trackerErr => {
-        console.error('[TRACKER TRACE ERROR]:', trackerErr);
-      });
+      sendEmail(to, subject, body, { cc: cc || [], bcc: bcc || [], senderName: adminName }, configId)
+        .then(() => {
+          console.log('[MAIL TOOL] Success: Email sent successfully');
+          // Trigger target validation and progression checks (asynchronously)
+          checkAndIncrementTargets(
+            to.join(', '),
+            subject,
+            cc && cc.length > 0 ? cc.join(', ') : undefined,
+            bcc && bcc.length > 0 ? bcc.join(', ') : undefined
+          ).catch(trackerErr => {
+            console.error('[TRACKER TRACE ERROR]:', trackerErr);
+          });
+        })
+        .catch(async (sendErr: any) => {
+          console.error('[MAIL TOOL ERROR] Background email sending failed:', sendErr.message);
+          try {
+            await prisma.adminMailHistory.update({
+              where: { id: historyId },
+              data: { status: 'FAILED' }
+            });
+          } catch (dbErr) {
+            console.error('[MAIL TOOL DATABASE ERROR]: Failed to mark mail history as FAILED', dbErr);
+          }
+        });
     }
 
     return NextResponse.json({ success: true, message: 'Process completed', historyItem });

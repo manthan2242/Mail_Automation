@@ -59,6 +59,7 @@ model UserAiKey {
 
 model EmailConfig {
   id          String            @id @default(uuid())
+  name        String            @default("Mail Automation")
   host        String
   port        Int
   email       String            @unique

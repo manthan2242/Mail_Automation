@@ -24,7 +24,8 @@ export async function GET(request: Request) {
         id: true,
         email: true,
         host: true,
-        port: true
+        port: true,
+        name: true
       }
     });
     console.log(`[API] Success: Found ${configs.length} configs`);
@@ -44,6 +45,7 @@ export async function POST(request: Request) {
     console.log('[API] POST /api/admin/email-configs - Creating SMTP config for:', data.email);
     const config = await prisma.emailConfig.create({
       data: {
+        name: data.name,
         host: data.host,
         port: parseInt(data.port.toString()),
         email: data.email,
@@ -65,16 +67,17 @@ export async function PATCH(request: Request) {
     if ('error' in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
     const data = await request.json();
-    const { id, host, port, email, password } = data;
+    const { id, host, port, email, password, name } = data;
 
     console.log('[API] PATCH /api/admin/email-configs - Updating config:', id);
-    console.log('[API] Fields to update:', { host, port, email, hasPassword: !!password });
+    console.log('[API] Fields to update:', { host, port, email, hasPassword: !!password, name });
 
     if (!id) return NextResponse.json({ error: 'ID is required' }, { status: 400 });
 
     const config = await prisma.emailConfig.update({
       where: { id },
       data: {
+        ...(name && { name }),
         ...(host && { host }),
         ...(port && { port: parseInt(port.toString()) }),
         ...(email && { email }),

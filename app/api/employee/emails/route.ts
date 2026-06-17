@@ -72,7 +72,7 @@ export async function POST(request: Request) {
       `Draft Submitted: ${subject}`,
       `Hi ${(payload as any).name || 'Employee'},\n\nYour request for "${subject}" has been submitted for review.`,
       { noBcc: true }
-    ).catch((e) => {
+    ).catch((e: any) => {
       console.warn('[NOTIFY ERROR]: Could not send submission copy to employee', e);
     });
 

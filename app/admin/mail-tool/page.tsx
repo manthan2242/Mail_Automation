@@ -88,7 +88,7 @@ const validateEmails = (emailString: string): { valid: boolean; message: string 
 export default function AdminMailTool() {
   const [history, setHistory] = useState<MailHistoryItem[]>([]);
   const [configs, setConfigs] = useState<EmailConfig[]>([]);
-  const [selectedConfigId, setSelectedConfigId] = useState<string>('default');
+  const [selectedConfigId, setSelectedConfigId] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [genLoading, setGenLoading] = useState(false);
   const [sendLoading, setSendLoading] = useState(false);
@@ -216,17 +216,20 @@ export default function AdminMailTool() {
     }
   };
 
-  const fetchConfigs = async () => {
-    try {
-      const res = await fetch('/api/admin/email-configs', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      const data = await res.json();
-      setConfigs(Array.isArray(data) ? data : []);
-    } catch (error) {
-      toast.error('Failed to load SMTP configs');
-    }
-  };
+    const fetchConfigs = async () => {
+      try {
+        const res = await fetch('/api/admin/email-configs', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          setConfigs(data);
+          setSelectedConfigId('');
+        }
+      } catch (error) {
+        toast.error('Failed to load SMTP configs');
+      }
+    };
 
   useEffect(() => {
     if (token) {
@@ -285,6 +288,11 @@ export default function AdminMailTool() {
   };
 
   const handleProcessMail = async (status: 'SENT' | 'DRAFT') => {
+    if (!selectedConfigId) {
+      toast.error('Please select a sender email configurations');
+      return;
+    }
+
     // Validate TO field (required)
     if (toEmails.length === 0) {
       toast.error('Please enter at least one recipient (TO)');
@@ -378,12 +386,11 @@ export default function AdminMailTool() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
                     <Label className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider ml-1">Send From</Label>
-                    <Select value={selectedConfigId} onValueChange={(val) => setSelectedConfigId(val || 'default')}>
+                    <Select value={selectedConfigId} onValueChange={(val) => setSelectedConfigId(val || '')}>
                       <SelectTrigger className="rounded-xl border-[#e2e8f0] h-12 focus:ring-indigo-500/20">
                         <SelectValue placeholder="Select Sender" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="default">System Default (via .env)</SelectItem>
                         {configs.map(config => (
                           <SelectItem key={config.id} value={config.id}>{config.email}</SelectItem>
                         ))}

@@ -164,7 +164,6 @@ export default function GenerateEmailPage() {
       .then(data => {
         if (Array.isArray(data)) {
           setConfigs(data);
-          setSourceEmail(user?.email || (data.length > 0 ? data[0].email : ''));
         }
       })
       .catch(() => {});
@@ -173,6 +172,10 @@ export default function GenerateEmailPage() {
   }, [token, user]);
 
   const handleGenerate = async () => {
+    if (!sourceEmail) {
+      toast.error('From email is required');
+      return;
+    }
     if (!subject) {
       toast.error('Please enter a subject or topic');
       return;
@@ -211,6 +214,10 @@ export default function GenerateEmailPage() {
   };
 
   const handleSend = async () => {
+    if (!sourceEmail) {
+      toast.error('From email is required');
+      return;
+    }
     let finalRecipients = [...recipients];
     if (recipientInput.trim() && recipientInput.includes('@') && !finalRecipients.includes(recipientInput.trim())) {
       finalRecipients.push(recipientInput.trim());
@@ -276,11 +283,6 @@ export default function GenerateEmailPage() {
                   <SelectContent className="bg-white rounded-xl border-[#e2e8f0] shadow-xl">
                     <SelectGroup>
                       <SelectLabel className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider px-3 py-2">Available Senders</SelectLabel>
-                      {user?.email && (
-                        <SelectItem value={user.email} className="rounded-lg mx-1 my-0.5 hover:bg-slate-50 font-medium">
-                          {user.email} (Personal)
-                        </SelectItem>
-                      )}
                       {configs.map(config => (
                         <SelectItem key={config.id} value={config.email} className="rounded-lg mx-1 my-0.5 hover:bg-slate-50">
                           {config.email}

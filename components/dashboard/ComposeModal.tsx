@@ -82,11 +82,7 @@ export default function ComposeModal({ onClose }: { onClose: () => void }) {
         const data = await res.json();
         if (Array.isArray(data)) {
           setIdentities(data);
-          if (isAdmin) {
-            setSelectedIdentity('default');
-          } else {
-            setSelectedIdentity(user.email || (data.length > 0 ? data[0].email : ''));
-          }
+          setSelectedIdentity('');
         }
       } catch (err) {} finally {
         setLoading(false);
@@ -370,12 +366,6 @@ export default function ComposeModal({ onClose }: { onClose: () => void }) {
                 <SelectValue placeholder="Select Sender" />
               </SelectTrigger>
               <SelectContent className="bg-white rounded-xl shadow-lg border border-gray-100 z-[200]">
-                {user?.role === 'admin' && (
-                  <SelectItem value="default" className="text-xs sm:text-sm font-medium">Default SMTP (.env)</SelectItem>
-                )}
-                {user?.role === 'employee' && user?.email && (
-                  <SelectItem value={user.email} className="text-xs sm:text-sm font-medium">{user.email} (Personal)</SelectItem>
-                )}
                 {identities.map(id => (
                   <SelectItem key={id.id} value={id.email} className="text-xs sm:text-sm font-medium">{id.email}</SelectItem>
                 ))}

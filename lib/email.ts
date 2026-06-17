@@ -26,9 +26,10 @@ export const sendEmail = async (
     noBcc?: boolean;
     emailConfigId?: string;
     attachments?: { filename: string; content: string; contentType?: string }[];
+    senderName?: string;
   },
   emailConfigId?: string // Keep for backwards compatibility
-) => {
+): Promise<any> => {
   // Handle backwards compatibility
   const opts = {
     replyTo: options?.replyTo,
@@ -48,6 +49,7 @@ export const sendEmail = async (
     !u || !p || u.includes('example.com') || p.includes('your-') || p === 'app-password-here';
 
   // 1. If a specific config ID was provided, use that config from DB
+  let smtpConfigName: string | undefined;
   if (opts.emailConfigId && opts.emailConfigId !== 'default') {
     const config = await prisma.emailConfig.findUnique({
       where: { id: opts.emailConfigId }
@@ -58,6 +60,7 @@ export const sendEmail = async (
       host = config.host;
       port = config.port;
       service = config.host?.includes('gmail') ? 'gmail' : undefined;
+      smtpConfigName = config.name;
     }
   } 
   
@@ -89,6 +92,22 @@ export const sendEmail = async (
 
   const fromEmail = opts.replyTo || (opts.emailConfigId && opts.emailConfigId !== 'default' ? user : (process.env.FROM_EMAIL || user));
   
+  let cleanFromEmail = fromEmail;
+  if (fromEmail) {
+    const match = /<([^>]+)>/.exec(fromEmail);
+    cleanFromEmail = match ? match[1] : fromEmail;
+    cleanFromEmail = cleanFromEmail.trim().toLowerCase();
+  }
+
+  if (!smtpConfigName && cleanFromEmail) {
+    const config = await prisma.emailConfig.findUnique({
+      where: { email: cleanFromEmail }
+    });
+    if (config) {
+      smtpConfigName = config.name;
+    }
+  }
+  
   // Convert arrays to comma-separated strings for nodemailer
   const toStr = Array.isArray(to) ? to.join(', ') : to;
   const ccStr = Array.isArray(opts.cc) ? opts.cc.join(', ') : opts.cc;
@@ -114,8 +133,9 @@ export const sendEmail = async (
   });
 
   const appName = process.env.NEXT_PUBLIC_APP_NAME || 'Sales Force Pro';
+  const senderName = smtpConfigName || options?.senderName || appName;
   const mailOptions: nodemailer.SendMailOptions = {
-    from: `"${appName}" <${fromEmail}>`,
+    from: `"${senderName}" <${fromEmail}>`,
     to: toStr,
     ...(ccStr && { cc: ccStr }),
     subject,
@@ -135,6 +155,21 @@ export const sendEmail = async (
       command: error.command,
       response: error.response
     });
+
+    // Fallback logic if it's a custom SMTP config and fails:
+    if (opts.emailConfigId && opts.emailConfigId !== 'default') {
+      console.warn(`[SMTP FALLBACK]: Custom SMTP sending failed. Retrying using system default SMTP...`);
+      try {
+        const fallbackOptions = {
+          ...options,
+          emailConfigId: 'default' // enforce default system SMTP
+        };
+        return await sendEmail(to, subject, text, fallbackOptions);
+      } catch (fallbackError: any) {
+        console.error(`[SMTP FALLBACK FATAL ERROR]: Default SMTP also failed:`, fallbackError.message);
+        throw fallbackError;
+      }
+    }
 
     if (error.code === 'EAUTH') {
       throw new Error('SMTP Authentication failed. Ensure you are using a 16-character Gmail App Password.');

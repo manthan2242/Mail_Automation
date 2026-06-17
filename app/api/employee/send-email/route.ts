@@ -29,20 +29,20 @@ export async function POST(request: Request) {
 
     const isAdmin = payload.role === 'admin';
 
+    let adminName: string | undefined;
+    if (isAdmin) {
+      const admin = await prisma.admin.findUnique({
+        where: { id: payload.id },
+        select: { name: true }
+      });
+      if (admin) {
+        adminName = admin.name;
+      }
+    }
+
     let emailRecord;
     if (isAdmin) {
-      // Step 1: Send real email via Nodemailer immediately for admins
-      console.log(`[MAIL] Admin sending: Attempting to send email via Nodemailer to: ${recipientEmail}`);
-      await sendEmail(recipientEmail, subject, body, { 
-        replyTo: sourceEmail || undefined,
-        emailConfigId: configId || undefined,
-        cc: cc || undefined,
-        bcc: bcc || undefined,
-        attachments: attachments || undefined
-      });
-      console.log('[MAIL] Success: Email sent successfully via Nodemailer');
-
-      // Step 2: Save to PostgreSQL via Prisma with SENT status
+      // Step 1: Save to PostgreSQL via Prisma with SENT status (first, so response can be fast)
       console.log('[DATABASE] Saving email record to DB...');
       emailRecord = await prisma.email.create({
         data: {
@@ -58,11 +58,37 @@ export async function POST(request: Request) {
           attachments: attachments ? JSON.stringify(attachments) : null,
         }
       });
-      console.log(`[DATABASE] Success: Saved to DB with ID: ${emailRecord.id}`);
+      const targetId = emailRecord.id;
+      console.log(`[DATABASE] Success: Saved to DB with ID: ${targetId}`);
 
-      // Trigger target validation and progression checks (asynchronously)
-      checkAndIncrementTargets(recipientEmail, subject, cc, bcc).catch(trackerErr => {
-        console.error('[TRACKER TRACE ERROR]:', trackerErr);
+      // Step 2: Send real email via Nodemailer asynchronously
+      console.log(`[MAIL] Admin sending: Attempting background email via Nodemailer to: ${recipientEmail}`);
+      sendEmail(recipientEmail, subject, body, { 
+        replyTo: sourceEmail || undefined,
+        emailConfigId: configId || undefined,
+        cc: cc || undefined,
+        bcc: bcc || undefined,
+        attachments: attachments || undefined,
+        senderName: adminName
+      }).then(() => {
+        console.log('[MAIL] Success: Email sent successfully via Nodemailer');
+        // Trigger target validation and progression checks (asynchronously)
+        checkAndIncrementTargets(recipientEmail, subject, cc, bcc).catch(trackerErr => {
+          console.error('[TRACKER TRACE ERROR]:', trackerErr);
+        });
+      }).catch(async (sendErr: any) => {
+        console.error('[MAIL ERROR] Background email sending failed:', sendErr.message);
+        try {
+          await prisma.email.update({
+            where: { id: targetId },
+            data: { 
+              status: 'FAILED',
+              adminComment: `Send error: ${sendErr.message}`
+            }
+          });
+        } catch (dbErr) {
+          console.error('[MAIL DATABASE ERROR]: Failed to mark email status as FAILED', dbErr);
+        }
       });
     } else {
       // For employees, save as PENDING for admin approval
@@ -89,7 +115,7 @@ export async function POST(request: Request) {
         `Draft Submitted: ${subject}`,
         `Hi ${(payload as any).name || 'Employee'},\n\nYour request for "${subject}" has been submitted for review.`,
         { noBcc: true }
-      ).catch((e) => {
+      ).catch((e: any) => {
         console.warn('[NOTIFY ERROR]: Could not send submission copy to employee', e);
       });
     }

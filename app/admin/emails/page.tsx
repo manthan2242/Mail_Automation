@@ -66,7 +66,7 @@ export default function EmailMonitoringPage() {
   const [selectedClientId, setSelectedClientId] = useState<string>('all');
   const [selectedEmail, setSelectedEmail] = useState<Email | null>(null);
   const [adminComment, setAdminComment] = useState('');
-  const [selectedFromEmail, setSelectedFromEmail] = useState('default');
+  const [selectedFromEmail, setSelectedFromEmail] = useState('');
   const [isActionOpen, setIsActionOpen] = useState(false);
   const [isComposeOpen, setIsComposeOpen] = useState(false);
   const [isEditDraftOpen, setIsEditDraftOpen] = useState(false);
@@ -276,6 +276,10 @@ export default function EmailMonitoringPage() {
   };
 
   const handleSendApproved = async (emailId: string) => {
+    if (!selectedFromEmail) {
+      toast.error('Please select a sender email configurations');
+      return;
+    }
     setSendLoading(true);
     try {
       const res = await fetch('/api/admin/send-email', {
@@ -286,8 +290,8 @@ export default function EmailMonitoringPage() {
         },
         body: JSON.stringify({ 
           emailId, 
-          fromEmail: selectedFromEmail === 'default' ? undefined : configs.find(c => c.id === selectedFromEmail)?.email,
-          configId: selectedFromEmail === 'default' ? undefined : selectedFromEmail
+          fromEmail: configs.find(c => c.id === selectedFromEmail)?.email,
+          configId: selectedFromEmail
         }),
       });
       const data = await res.json();
@@ -447,7 +451,7 @@ export default function EmailMonitoringPage() {
                     if (open) {
                       setSelectedEmail(email);
                       setAdminComment(email.adminComment || '');
-                      setSelectedFromEmail(email.configId || 'default');
+                      setSelectedFromEmail(email.configId || '');
                     }
                   }}>
                     <DialogTrigger
@@ -697,7 +701,7 @@ export default function EmailMonitoringPage() {
                         if (open) {
                           setSelectedEmail(email);
                           setAdminComment(email.adminComment || '');
-                          setSelectedFromEmail(email.configId || 'default');
+                          setSelectedFromEmail(email.configId || '');
                         }
                       }}>
                         <DialogTrigger
@@ -859,12 +863,11 @@ export default function EmailMonitoringPage() {
                                   
                                   <div className="text-left space-y-2 mb-6">
                                     <Label className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider">Final Sender Selection</Label>
-                                    <Select onValueChange={(val) => setSelectedFromEmail(val || 'default')} value={selectedFromEmail}>
+                                    <Select onValueChange={(val) => setSelectedFromEmail(val || '')} value={selectedFromEmail}>
                                       <SelectTrigger className="w-full rounded-2xl border-[#e2e8f0] h-12 bg-[#f8fafc] text-[#64748b] font-medium shadow-none focus:ring-[#6366f1] px-4">
                                         <SelectValue placeholder="Select sender email" />
                                       </SelectTrigger>
                                       <SelectContent className="bg-white rounded-xl">
-                                        <SelectItem value="default">Default SMTP (.env)</SelectItem>
                                         {configs.map(config => (
                                           <SelectItem key={config.id} value={config.id}>{config.email}</SelectItem>
                                         ))}
