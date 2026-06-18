@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
-import { Minus, Maximize2, X, Paperclip, Link as LinkIcon, Smile, Image as ImageIcon, Trash2, Send, Triangle, Lock, PenTool, Sparkles, Bold, Italic, Underline, AlignLeft, AlignCenter, AlignRight, List, ListOrdered, Undo, Redo, ChevronDown, HardDrive, File as FileIcon } from 'lucide-react';
+import { Minus, Maximize2, X, Paperclip, Link as LinkIcon, Smile, Image as ImageIcon, Trash2, Send, Triangle, Lock, PenTool, Sparkles, Bold, Italic, Underline, AlignLeft, AlignCenter, AlignRight, List, ListOrdered, Undo, Redo, ChevronDown, HardDrive, File as FileIcon, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAuth } from '@/hooks/useAuth';
@@ -11,7 +11,13 @@ interface Contact {
   name: string;
 }
 
-export default function ComposeModal({ onClose }: { onClose: () => void }) {
+export default function ComposeModal({ 
+  onClose,
+  forceSchedule = false
+}: { 
+  onClose: () => void;
+  forceSchedule?: boolean;
+}) {
   const [to, setTo] = useState<string[]>([]);
   const [cc, setCc] = useState<string[]>([]);
   const [bcc, setBcc] = useState<string[]>([]);
@@ -53,6 +59,36 @@ export default function ComposeModal({ onClose }: { onClose: () => void }) {
   const [showConfidentialModal, setShowConfidentialModal] = useState(false);
   const [confidentialExpiry, setConfidentialExpiry] = useState('Expires in 1 week');
   const [confidentialPasscode, setConfidentialPasscode] = useState('none');
+
+  // Pre-fill default date & time (1 hour in the future) if forceSchedule is true
+  const getDefaultDateTime = () => {
+    if (!forceSchedule) return { date: '', time: '' };
+    const d = new Date();
+    d.setHours(d.getHours() + 1);
+    
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    const hh = String(d.getHours()).padStart(2, '0');
+    const min = String(d.getMinutes()).padStart(2, '0');
+    
+    return { date: `${yyyy}-${mm}-${dd}`, time: `${hh}:${min}` };
+  };
+
+  const defaultDT = getDefaultDateTime();
+  const [scheduledDate, setScheduledDate] = useState(defaultDT.date);
+  const [scheduledTime, setScheduledTime] = useState(defaultDT.time);
+
+  const getScheduledAtDate = (): Date | null => {
+    if (!scheduledDate || !scheduledTime) return null;
+    const [year, month, day] = scheduledDate.split('-').map(Number);
+    const [hour, minute] = scheduledTime.split(':').map(Number);
+    if (isNaN(year) || isNaN(month) || isNaN(day) || isNaN(hour) || isNaN(minute)) return null;
+    const dt = new Date(year, month - 1, day, hour, minute);
+    return isNaN(dt.getTime()) ? null : dt;
+  };
+
+  const scheduledAt = getScheduledAtDate();
 
   const { token, user } = useAuth();
   const wrapperRef = useRef<HTMLDivElement>(null);
@@ -258,6 +294,25 @@ export default function ComposeModal({ onClose }: { onClose: () => void }) {
       toast.error('To, Subject, and Body are required');
       return;
     }
+    
+    // Only parse/validate scheduling if forceSchedule is enabled
+    let calculatedScheduledAt: Date | null = null;
+    if (forceSchedule) {
+      if (!scheduledDate || !scheduledTime) {
+        toast.error('Please select both date and time to schedule');
+        return;
+      }
+      calculatedScheduledAt = getScheduledAtDate();
+      if (!calculatedScheduledAt) {
+        toast.error('Invalid schedule date or time');
+        return;
+      }
+      if (calculatedScheduledAt.getTime() <= Date.now()) {
+        toast.error('Scheduled time must be in the future');
+        return;
+      }
+    }
+
     if (!selectedIdentity) {
       toast.error('From email is required');
       return;
@@ -282,7 +337,8 @@ export default function ComposeModal({ onClose }: { onClose: () => void }) {
         body: finalBody,
         fromEmail: fromEmail,
         configId: configId,
-        attachments: base64Attachments
+        attachments: base64Attachments,
+        scheduledAt: calculatedScheduledAt ? calculatedScheduledAt.toISOString() : undefined
       } : {
         recipientEmail: to.join(','),
         cc: cc.join(','),
@@ -291,7 +347,8 @@ export default function ComposeModal({ onClose }: { onClose: () => void }) {
         body: finalBody,
         sourceEmail: fromEmail || user?.email,
         configId: configId,
-        attachments: base64Attachments
+        attachments: base64Attachments,
+        scheduledAt: calculatedScheduledAt ? calculatedScheduledAt.toISOString() : undefined
       };
 
       const res = await fetch(endpoint, {
@@ -474,6 +531,31 @@ export default function ComposeModal({ onClose }: { onClose: () => void }) {
           <input type="text" className="w-full outline-none text-sm sm:text-base py-1 font-medium text-gray-800" placeholder="Subject" value={subject} onChange={(e) => setSubject(e.target.value)} />
         </div>
 
+        {/* Schedule Send Field - Only visible when forceSchedule is true */}
+        {forceSchedule && (
+          <div className="relative border-b border-gray-100 px-4 py-2 flex flex-col sm:flex-row sm:items-center justify-between bg-slate-50/50 min-h-[46px] gap-2">
+            <span className="text-gray-500 text-xs sm:text-sm font-medium w-32 shrink-0 flex items-center gap-1.5">
+              <Clock className="w-4 h-4 text-[#6366f1]" />
+              Schedule Send
+            </span>
+            <div className="flex-1 flex flex-wrap items-center gap-2 justify-start sm:justify-end">
+              <input 
+                type="date" 
+                value={scheduledDate}
+                min={new Date().toISOString().split('T')[0]}
+                onChange={(e) => setScheduledDate(e.target.value)}
+                className="text-xs border border-gray-200 rounded-xl px-3 py-1.5 bg-white outline-none focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 font-medium text-gray-800"
+              />
+              <input 
+                type="time" 
+                value={scheduledTime}
+                onChange={(e) => setScheduledTime(e.target.value)}
+                className="text-xs border border-gray-200 rounded-xl px-3 py-1.5 bg-white outline-none focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 font-medium text-gray-800"
+              />
+            </div>
+          </div>
+        )}
+
         {/* Formatting Toolbar - Added horizontal scroll for mobile */}
         {showToolbar && (
           <div className="px-2 py-1.5 bg-gray-50 border-b border-gray-100 flex items-center gap-1 overflow-x-auto no-scrollbar shrink-0">
@@ -503,20 +585,36 @@ export default function ComposeModal({ onClose }: { onClose: () => void }) {
             )}
           </div>
         </div>
+        
+        {/* Banner only shown if forceSchedule is enabled and scheduledAt is valid */}
+        {forceSchedule && scheduledAt && (
+          <div className="mx-4 mb-3 p-3 bg-indigo-50 border border-indigo-100 rounded-xl flex items-center justify-between text-xs text-indigo-700 font-medium">
+            <span className="flex items-center gap-1.5">
+              <Clock className="w-4 h-4 text-[#6366f1] animate-pulse" />
+              Scheduled for: {scheduledAt.toLocaleString([], { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+            </span>
+            <button
+              type="button"
+              className="text-[#6366f1] hover:text-indigo-800 font-bold uppercase tracking-wider text-[10px]"
+              onClick={() => {
+                const defaultDT = getDefaultDateTime();
+                setScheduledDate(defaultDT.date);
+                setScheduledTime(defaultDT.time);
+              }}
+            >
+              Reset
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Bottom Actions - Optimized for Mobile, no extra bottom gap */}
       <div className="px-3 sm:px-4 py-3 bg-white border-t border-gray-100 shrink-0">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1 sm:gap-2">
-            <div className="relative flex items-center h-9">
-              <button className="bg-[#0b57d0] hover:bg-[#084298] text-white rounded-l-full px-3 sm:px-5 h-9 font-medium text-xs sm:text-sm flex items-center" onClick={handleSend} disabled={sending}>
-                {sending ? '...' : 'Send'}
-              </button>
-              <button className="bg-[#0b57d0] hover:bg-[#084298] text-white rounded-r-full px-1.5 h-9 border-l border-white/20" onClick={() => setShowSendOptions(!showSendOptions)}>
-                <ChevronDown className="w-4 h-4" />
-              </button>
-            </div>
+            <button className="bg-[#0b57d0] hover:bg-[#084298] text-white rounded-full px-5 h-9 font-medium text-xs sm:text-sm flex items-center shadow-sm" onClick={handleSend} disabled={sending}>
+              {sending ? '...' : (forceSchedule ? 'Schedule Send' : 'Send')}
+            </button>
             
             {/* Scrollable icon list for small screens */}
             <div className="flex items-center gap-2 sm:gap-4 ml-1 sm:ml-4 overflow-x-auto no-scrollbar max-w-[150px] sm:max-w-none text-gray-500">

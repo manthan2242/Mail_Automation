@@ -17,7 +17,9 @@ import {
   AlertCircle,
   Send,
   Zap,
-  Briefcase
+  Briefcase,
+  Activity,
+  ClipboardList
 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -54,8 +56,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const adminItems = [
     { href: '/admin/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
     { href: '/admin/clients', icon: Briefcase, label: 'Clients & Targets' },
+    { href: '/admin/scheduler', icon: Clock, label: 'Email Scheduler' },
     { href: '/admin/mail-tool', icon: Send, label: 'Mail Writer' },
     { href: '/admin/employees', icon: Users, label: 'Team Members' },
+    { href: '/admin/attendance', icon: ClipboardList, label: 'Attendance Log' },
     { href: '/admin/emails', icon: Mail, label: 'Email Monitoring' },
     { href: '/admin/email-configs', icon: Settings, label: 'SMTP Config' },
     { href: '/admin/api-keys', icon: Key, label: 'API Keys' },
@@ -63,8 +67,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   const employeeItems = [
     { href: '/employee/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+    { href: '/employee/scheduler', icon: Clock, label: 'Email Scheduler' },
     { href: '/employee/generate', icon: Send, label: 'Generate Email' },
-    { href: '/employee/status', icon: Clock, label: 'Status Tracking' },
+    { href: '/employee/status', icon: Activity, label: 'Status Tracking' },
     { href: '/employee/settings', icon: Zap, label: 'AI Settings' },
   ];
 

@@ -39,7 +39,7 @@ export async function POST(request: Request) {
     const payload = await verifyToken(token);
     if (!payload) return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
 
-    const { to, cc, bcc, subject, body, fromEmail, configId, attachments } = await request.json();
+    const { to, cc, bcc, subject, body, fromEmail, configId, attachments, scheduledAt } = await request.json();
 
     if (!subject || !body) {
       return NextResponse.json({ error: 'Subject and body are required' }, { status: 400 });
@@ -62,6 +62,7 @@ export async function POST(request: Request) {
         senderId: payload.id,
         configId: configId || null,
         status: 'PENDING',
+        scheduledAt: scheduledAt ? new Date(scheduledAt) : null,
         attachments: attachments ? JSON.stringify(attachments) : null,
       },
     });
@@ -80,5 +81,42 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error('Failed to submit email:', error);
     return NextResponse.json({ error: 'Failed to submit email' }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: Request) {
+  try {
+    const token = request.headers.get('authorization')?.split(' ')[1];
+    if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    const payload = await verifyToken(token);
+    if (!payload || payload.role !== 'employee') {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+    const { id } = await request.json();
+    if (!id) return NextResponse.json({ error: 'ID is required' }, { status: 400 });
+
+    // Verify ownership
+    const email = await prisma.email.findUnique({
+      where: { id }
+    });
+
+    if (!email) {
+      return NextResponse.json({ error: 'Email not found' }, { status: 404 });
+    }
+
+    if (email.senderId !== payload.id) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+    await prisma.email.delete({
+      where: { id }
+    });
+
+    return NextResponse.json({ success: true });
+  } catch (error: any) {
+    console.error('Email DELETE Error:', error);
+    return NextResponse.json({ error: 'Failed to delete email', details: error.message }, { status: 500 });
   }
 }

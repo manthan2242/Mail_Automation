@@ -12,7 +12,7 @@ export async function POST(request: Request) {
     const payload = await verifyToken(token);
     if (!payload) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const { recipientEmail, cc, bcc, subject, body, sourceEmail, configId, attachments } = await request.json();
+    const { recipientEmail, cc, bcc, subject, body, sourceEmail, configId, attachments, scheduledAt } = await request.json();
     
     if (!sourceEmail || sourceEmail.trim() === "") {
         return NextResponse.json({ error: 'Source email is required' }, { status: 400 });
@@ -42,7 +42,10 @@ export async function POST(request: Request) {
 
     let emailRecord;
     if (isAdmin) {
-      // Step 1: Save to PostgreSQL via Prisma with SENT status (first, so response can be fast)
+      const isScheduled = scheduledAt && new Date(scheduledAt).getTime() > Date.now();
+      const targetStatus = isScheduled ? 'SCHEDULED' : 'SENT';
+
+      // Step 1: Save to PostgreSQL via Prisma with targetStatus
       console.log('[DATABASE] Saving email record to DB...');
       emailRecord = await prisma.email.create({
         data: {
@@ -54,42 +57,45 @@ export async function POST(request: Request) {
           body,
           adminSenderId: payload.id,
           configId: configId || null,
-          status: 'SENT',
+          status: targetStatus,
+          scheduledAt: scheduledAt ? new Date(scheduledAt) : null,
           attachments: attachments ? JSON.stringify(attachments) : null,
         }
       });
       const targetId = emailRecord.id;
       console.log(`[DATABASE] Success: Saved to DB with ID: ${targetId}`);
 
-      // Step 2: Send real email via Nodemailer asynchronously
-      console.log(`[MAIL] Admin sending: Attempting background email via Nodemailer to: ${recipientEmail}`);
-      sendEmail(recipientEmail, subject, body, { 
-        replyTo: sourceEmail || undefined,
-        emailConfigId: configId || undefined,
-        cc: cc || undefined,
-        bcc: bcc || undefined,
-        attachments: attachments || undefined,
-        senderName: adminName
-      }).then(() => {
-        console.log('[MAIL] Success: Email sent successfully via Nodemailer');
-        // Trigger target validation and progression checks (asynchronously)
-        checkAndIncrementTargets(recipientEmail, subject, cc, bcc).catch(trackerErr => {
-          console.error('[TRACKER TRACE ERROR]:', trackerErr);
-        });
-      }).catch(async (sendErr: any) => {
-        console.error('[MAIL ERROR] Background email sending failed:', sendErr.message);
-        try {
-          await prisma.email.update({
-            where: { id: targetId },
-            data: { 
-              status: 'FAILED',
-              adminComment: `Send error: ${sendErr.message}`
-            }
+      if (!isScheduled) {
+        // Step 2: Send real email via Nodemailer asynchronously
+        console.log(`[MAIL] Admin sending: Attempting background email via Nodemailer to: ${recipientEmail}`);
+        sendEmail(recipientEmail, subject, body, { 
+          replyTo: sourceEmail || undefined,
+          emailConfigId: configId || undefined,
+          cc: cc || undefined,
+          bcc: bcc || undefined,
+          attachments: attachments || undefined,
+          senderName: adminName
+        }).then(() => {
+          console.log('[MAIL] Success: Email sent successfully via Nodemailer');
+          // Trigger target validation and progression checks (asynchronously)
+          checkAndIncrementTargets(recipientEmail, subject, cc, bcc).catch(trackerErr => {
+            console.error('[TRACKER TRACE ERROR]:', trackerErr);
           });
-        } catch (dbErr) {
-          console.error('[MAIL DATABASE ERROR]: Failed to mark email status as FAILED', dbErr);
-        }
-      });
+        }).catch(async (sendErr: any) => {
+          console.error('[MAIL ERROR] Background email sending failed:', sendErr.message);
+          try {
+            await prisma.email.update({
+              where: { id: targetId },
+              data: { 
+                status: 'FAILED',
+                adminComment: `Send error: ${sendErr.message}`
+              }
+            });
+          } catch (dbErr) {
+            console.error('[MAIL DATABASE ERROR]: Failed to mark email status as FAILED', dbErr);
+          }
+        });
+      }
     } else {
       // For employees, save as PENDING for admin approval
       console.log('[DATABASE] Employee sending: Saving pending email record to DB...');
@@ -104,6 +110,7 @@ export async function POST(request: Request) {
           senderId: payload.id,
           configId: configId || null,
           status: 'PENDING',
+          scheduledAt: scheduledAt ? new Date(scheduledAt) : null,
           attachments: attachments ? JSON.stringify(attachments) : null,
         }
       });

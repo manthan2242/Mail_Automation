@@ -34,6 +34,17 @@ export default function EmployeesPage() {
   const [editForm, setEditForm] = useState({ email: '', username: '', name: '' });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { token } = useAuth();
+
+  const formatWorkingHours = (clockIn: string, clockOut: string | null) => {
+    const start = new Date(clockIn);
+    const end = clockOut ? new Date(clockOut) : new Date();
+    const diffMs = end.getTime() - start.getTime();
+    if (diffMs < 0) return '0h 0m';
+    const diffMins = Math.floor(diffMs / 60000);
+    const hrs = Math.floor(diffMins / 60);
+    const mins = diffMins % 60;
+    return `${hrs}h ${mins}m`;
+  };
   
   const handleSendOTP = async (employeeId: string) => {
     try {
@@ -797,6 +808,7 @@ export default function EmployeesPage() {
                       <TableHead className="px-4 py-3 text-[10px] font-bold text-[#64748b] uppercase tracking-wider">Date</TableHead>
                       <TableHead className="px-4 py-3 text-[10px] font-bold text-[#64748b] uppercase tracking-wider">Clock In</TableHead>
                       <TableHead className="px-4 py-3 text-[10px] font-bold text-[#64748b] uppercase tracking-wider">Clock Out</TableHead>
+                      <TableHead className="px-4 py-3 text-[10px] font-bold text-[#64748b] uppercase tracking-wider">Working Hours</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -839,6 +851,16 @@ export default function EmployeesPage() {
                                 >
                                   <Camera className="w-3.5 h-3.5" />
                                 </button>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell className="px-4 py-3 text-xs text-[#64748b]">
+                            <div className="flex items-center gap-1.5">
+                              <span>{formatWorkingHours(log.clockIn, log.clockOut)}</span>
+                              {!log.clockOut && (
+                                <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded uppercase tracking-wider animate-pulse">
+                                  Active
+                                </span>
                               )}
                             </div>
                           </TableCell>
@@ -974,7 +996,7 @@ export default function EmployeesPage() {
 
       {/* Daily Attendance Log Modal */}
       <Dialog open={isDailyLogOpen} onOpenChange={setIsDailyLogOpen}>
-        <DialogContent className="sm:max-w-[700px] w-[95vw] bg-white rounded-[24px] border-none shadow-2xl p-0 overflow-hidden">
+        <DialogContent className="sm:max-w-[780px] w-[95vw] bg-white rounded-[24px] border-none shadow-2xl p-0 overflow-hidden">
           <DialogHeader className="px-8 py-6 bg-[#f8fafc] border-b border-[#e2e8f0]">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
@@ -1002,22 +1024,33 @@ export default function EmployeesPage() {
                 <Table>
                   <TableHeader>
                     <TableRow className="bg-[#fafafa] hover:bg-[#fafafa]">
-                      <TableHead className="px-4 py-3 text-[10px] font-bold text-[#64748b] uppercase tracking-wider">Team Member</TableHead>
-                      <TableHead className="px-4 py-3 text-[10px] font-bold text-[#64748b] uppercase tracking-wider">Status</TableHead>
-                      <TableHead className="px-4 py-3 text-[10px] font-bold text-[#64748b] uppercase tracking-wider">Clock In</TableHead>
-                      <TableHead className="px-4 py-3 text-[10px] font-bold text-[#64748b] uppercase tracking-wider">Clock Out</TableHead>
+                      <TableHead className="px-4 py-3 text-[10px] font-bold text-[#64748b] uppercase tracking-wider w-[180px]">Team Member</TableHead>
+                      <TableHead className="px-4 py-3 text-[10px] font-bold text-[#64748b] uppercase tracking-wider w-[100px]">Status</TableHead>
+                      <TableHead className="px-4 py-3 text-[10px] font-bold text-[#64748b] uppercase tracking-wider">Clock-In & Clock-Out Sessions</TableHead>
+                      <TableHead className="px-4 py-3 text-[10px] font-bold text-[#64748b] uppercase tracking-wider text-right w-[120px]">Total Hours</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {dailyLogs.map((employee) => {
-                      const log = employee.attendanceLogs?.[0]; // Single log per employee per day
-                      const isPresent = !!log;
+                      const hasLogs = employee.attendanceLogs && employee.attendanceLogs.length > 0;
+                      const isClockedIn = hasLogs && employee.attendanceLogs.some((l: any) => l.clockOut === null);
                       
-                      const clockInDate = log ? new Date(log.clockIn) : null;
-                      const clockOutDate = log?.clockOut ? new Date(log.clockOut) : null;
+                      const calculateTotalWorkingHours = (logs: any[]) => {
+                        let totalMs = 0;
+                        for (const log of logs) {
+                          const start = new Date(log.clockIn);
+                          const end = log.clockOut ? new Date(log.clockOut) : new Date();
+                          const diffMs = end.getTime() - start.getTime();
+                          if (diffMs > 0) totalMs += diffMs;
+                        }
+                        const diffMins = Math.floor(totalMs / 60000);
+                        const hrs = Math.floor(diffMins / 60);
+                        const mins = diffMins % 60;
+                        return `${hrs}h ${mins}m`;
+                      };
 
                       return (
-                        <TableRow key={employee.id} className="hover:bg-slate-50/50 border-b border-[#e2e8f0]">
+                        <TableRow key={employee.id} className="hover:bg-slate-50/50 border-b border-[#e2e8f0] align-top">
                           <TableCell className="px-4 py-3 text-xs">
                             <div>
                               <p className="font-semibold text-[#1e293b]">{employee.name}</p>
@@ -1027,50 +1060,63 @@ export default function EmployeesPage() {
                           <TableCell className="px-4 py-3 text-xs">
                             <span className={cn(
                               "px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider",
-                              isPresent ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-rose-600"
+                              isClockedIn ? "bg-indigo-50 text-indigo-600" : hasLogs ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-rose-600"
                             )}>
-                              {isPresent ? 'Present' : 'Absent'}
+                              {isClockedIn ? 'Clocked In' : hasLogs ? 'Present' : 'Absent'}
                             </span>
                           </TableCell>
-                          <TableCell className="px-4 py-3 text-xs text-[#64748b]">
-                            {clockInDate ? (
-                              <div className="flex items-center gap-2">
-                                <span>{clockInDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                                {log.clockInImage && (
-                                  <button
-                                    onClick={() => setPreviewImage({ src: log.clockInImage, title: `${employee.name} - Clock In Photo` })}
-                                    className="p-1 hover:bg-slate-100 hover:text-[#6366f1] rounded border border-transparent hover:border-slate-200 transition-colors"
-                                    title="View Clock In Photo"
-                                  >
-                                    <Camera className="w-3.5 h-3.5" />
-                                  </button>
-                                )}
+                          <TableCell className="px-4 py-3 text-xs">
+                            {hasLogs ? (
+                              <div className="space-y-2.5">
+                                {employee.attendanceLogs.map((log: any, index: number) => {
+                                  const clockInDate = new Date(log.clockIn);
+                                  const clockOutDate = log.clockOut ? new Date(log.clockOut) : null;
+                                  
+                                  return (
+                                    <div key={log.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 bg-slate-50 hover:bg-slate-100/70 p-2 rounded-xl border border-slate-100 transition-colors text-[11px] text-[#334155]">
+                                      <span className="font-semibold text-slate-500">Session {index + 1}:</span>
+                                      
+                                      <div className="flex items-center gap-1">
+                                        <span>In: {clockInDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                        {log.clockInImage && (
+                                          <button
+                                            onClick={() => setPreviewImage({ src: log.clockInImage, title: `${employee.name} - Clock In (Session ${index + 1})` })}
+                                            className="p-0.5 hover:bg-white hover:text-[#6366f1] rounded border border-transparent hover:border-slate-200 transition-colors"
+                                            title="View Clock In Photo"
+                                          >
+                                            <Camera className="w-3.5 h-3.5" />
+                                          </button>
+                                        )}
+                                      </div>
+
+                                      <div className="flex items-center gap-1">
+                                        <span>
+                                          Out: {clockOutDate ? clockOutDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : <span className="text-indigo-600 font-bold animate-pulse">Active</span>}
+                                        </span>
+                                        {log.clockOutImage && (
+                                          <button
+                                            onClick={() => setPreviewImage({ src: log.clockOutImage, title: `${employee.name} - Clock Out (Session ${index + 1})` })}
+                                            className="p-0.5 hover:bg-white hover:text-[#6366f1] rounded border border-transparent hover:border-slate-200 transition-colors"
+                                            title="View Clock Out Photo"
+                                          >
+                                            <Camera className="w-3.5 h-3.5" />
+                                          </button>
+                                        )}
+                                      </div>
+
+                                      <span className="text-[10px] text-slate-400 font-medium ml-auto">
+                                        Duration: {formatWorkingHours(log.clockIn, log.clockOut)}
+                                      </span>
+                                    </div>
+                                  );
+                                })}
                               </div>
                             ) : (
-                              <span>-</span>
+                              <span className="text-[#64748b] italic">-</span>
                             )}
                           </TableCell>
-                          <TableCell className="px-4 py-3 text-xs text-[#64748b]">
-                            {isPresent ? (
-                              clockOutDate ? (
-                                <div className="flex items-center gap-2">
-                                  <span>{clockOutDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                                  {log.clockOutImage && (
-                                    <button
-                                      onClick={() => setPreviewImage({ src: log.clockOutImage, title: `${employee.name} - Clock Out Photo` })}
-                                      className="p-1 hover:bg-slate-100 hover:text-[#6366f1] rounded border border-transparent hover:border-slate-200 transition-colors"
-                                      title="View Clock Out Photo"
-                                    >
-                                      <Camera className="w-3.5 h-3.5" />
-                                    </button>
-                                  )}
-                                </div>
-                              ) : (
-                                <span className="text-emerald-600 font-bold animate-pulse">Active Session</span>
-                              )
-                            ) : (
-                              <span>-</span>
-                            )}
+                          <TableCell className="px-4 py-3 text-xs text-right font-bold text-[#1e293b]">
+                            {hasLogs ? calculateTotalWorkingHours(employee.attendanceLogs) : '-'}
                           </TableCell>
                         </TableRow>
                       );

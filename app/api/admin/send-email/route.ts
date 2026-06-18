@@ -21,7 +21,7 @@ export async function POST(request: Request) {
     const adminName = admin?.name;
 
     const bodyData = await request.json();
-    let { to, cc, bcc, subject, body, fromEmail, configId, emailId, attachments } = bodyData;
+    let { to, cc, bcc, subject, body, fromEmail, configId, emailId, attachments, scheduledAt } = bodyData;
 
     const attachmentError = validateAttachments(attachments);
     if (attachmentError) {
@@ -77,12 +77,16 @@ export async function POST(request: Request) {
     // Step 2: Update existing record or save new one (FIRST, so we can return response fast)
     console.log('[DATABASE] Updating email persistence...');
     let emailRecord;
+    const isScheduled = scheduledAt && new Date(scheduledAt).getTime() > Date.now();
+    const targetStatus = isScheduled ? 'SCHEDULED' : 'SENT';
+
     if (emailId) {
       emailRecord = await prisma.email.update({
         where: { id: emailId },
         data: { 
-          status: 'SENT',
-          configId: configId || undefined
+          status: targetStatus,
+          configId: configId || undefined,
+          scheduledAt: scheduledAt ? new Date(scheduledAt) : undefined
         }
       });
     } else {
@@ -94,9 +98,10 @@ export async function POST(request: Request) {
           fromEmail: fromEmail || process.env.EMAIL_USER || 'admin@system.com',
           subject: resolvedSubject,
           body: resolvedBody,
-          status: 'SENT',
+          status: targetStatus,
           adminSenderId: payload.id,
           configId: configId || undefined,
+          scheduledAt: scheduledAt ? new Date(scheduledAt) : null,
           attachments: resolvedAttachments ? JSON.stringify(resolvedAttachments) : null
         }
       });
@@ -104,36 +109,38 @@ export async function POST(request: Request) {
     const targetRecordId = emailRecord.id;
     console.log(`[DATABASE] Success: Sync complete for ${targetRecordId}`);
 
-    // Trigger SMTP send in the background (asynchronously)
-    console.log(`[ADMIN MAIL] Triggering background delivery to: ${resolvedTo}`);
-    sendEmail(resolvedTo, resolvedSubject, resolvedBody, {
-      replyTo: fromEmail || undefined,
-      emailConfigId: configId || undefined,
-      noBcc: false,
-      cc: resolvedCc,
-      bcc: resolvedBcc,
-      attachments: resolvedAttachments || undefined,
-      senderName: adminName
-    }).then(() => {
-      console.log('[ADMIN MAIL] Success: Email dispatched');
-      // Trigger target validation and progression checks (asynchronously)
-      checkAndIncrementTargets(resolvedTo, resolvedSubject, resolvedCc, resolvedBcc).catch(trackerErr => {
-        console.error('[TRACKER TRACE ERROR]:', trackerErr);
-      });
-    }).catch(async (sendErr: any) => {
-      console.error('[ADMIN MAIL ERROR] Background email sending failed:', sendErr.message);
-      try {
-        await prisma.email.update({
-          where: { id: targetRecordId },
-          data: { 
-            status: 'FAILED',
-            adminComment: `Send error: ${sendErr.message}`
-          }
+    if (!isScheduled) {
+      // Trigger SMTP send in the background (asynchronously)
+      console.log(`[ADMIN MAIL] Triggering background delivery to: ${resolvedTo}`);
+      sendEmail(resolvedTo, resolvedSubject, resolvedBody, {
+        replyTo: fromEmail || undefined,
+        emailConfigId: configId || undefined,
+        noBcc: false,
+        cc: resolvedCc,
+        bcc: resolvedBcc,
+        attachments: resolvedAttachments || undefined,
+        senderName: adminName
+      }).then(() => {
+        console.log('[ADMIN MAIL] Success: Email dispatched');
+        // Trigger target validation and progression checks (asynchronously)
+        checkAndIncrementTargets(resolvedTo, resolvedSubject, resolvedCc, resolvedBcc).catch(trackerErr => {
+          console.error('[TRACKER TRACE ERROR]:', trackerErr);
         });
-      } catch (dbErr) {
-        console.error('[ADMIN MAIL DATABASE ERROR]: Failed to mark email status as FAILED', dbErr);
-      }
-    });
+      }).catch(async (sendErr: any) => {
+        console.error('[ADMIN MAIL ERROR] Background email sending failed:', sendErr.message);
+        try {
+          await prisma.email.update({
+            where: { id: targetRecordId },
+            data: { 
+              status: 'FAILED',
+              adminComment: `Send error: ${sendErr.message}`
+            }
+          });
+        } catch (dbErr) {
+          console.error('[ADMIN MAIL DATABASE ERROR]: Failed to mark email status as FAILED', dbErr);
+        }
+      });
+    }
 
     // Notify employee that their mail has been sent (asynchronously)
     if (employeeToNotify) {

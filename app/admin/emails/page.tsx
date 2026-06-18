@@ -11,7 +11,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Mail, CheckCircle, XCircle, Clock, Eye, Sparkles, Send, Edit, Paperclip } from 'lucide-react';
+import { Mail, CheckCircle, XCircle, Clock, Eye, Sparkles, Send, Edit, Paperclip, Calendar } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
 import { motion } from 'motion/react';
@@ -27,11 +27,12 @@ interface Email {
   cc?: string;
   bcc?: string;
   fromEmail?: string;
-  status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'SENT';
+  status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'SENT' | 'SCHEDULED' | 'FAILED';
   employee?: { name: string; email: string };
   adminComment?: string;
   configId?: string;
   attachments?: string;
+  scheduledAt?: string;
   createdAt: string;
 }
 
@@ -316,7 +317,9 @@ export default function EmailMonitoringPage() {
       case 'PENDING': return <Badge variant="outline" className="bg-amber-50 text-amber-600 border-amber-200"><Clock className="w-3 h-3 mr-1" /> Pending</Badge>;
       case 'APPROVED': return <Badge variant="outline" className="bg-emerald-50 text-emerald-600 border-emerald-200"><CheckCircle className="w-3 h-3 mr-1" /> Approved</Badge>;
       case 'REJECTED': return <Badge variant="outline" className="bg-rose-50 text-rose-600 border-rose-200"><XCircle className="w-3 h-3 mr-1" /> Rejected</Badge>;
-      case 'SENT': return <Badge variant="outline" className="bg-indigo-50 text-indigo-600 border-indigo-200"><Send className="w-3 h-3 mr-1" /> Sent</Badge>;
+      case 'SENT': return <Badge variant="outline" className="bg-[#eef2ff] text-[#6366f1] border-[#c7d2fe]"><Send className="w-3 h-3 mr-1" /> Sent</Badge>;
+      case 'SCHEDULED': return <Badge variant="outline" className="bg-blue-50 text-blue-600 border-blue-200"><Calendar className="w-3 h-3 mr-1" /> Scheduled</Badge>;
+      case 'FAILED': return <Badge variant="outline" className="bg-rose-50 text-rose-600 border-rose-200"><XCircle className="w-3 h-3 mr-1" /> Failed</Badge>;
       default: return <Badge>{status}</Badge>;
     }
   };
@@ -478,7 +481,7 @@ export default function EmailMonitoringPage() {
                             </div>
                           </div>
                           
-                          {email.cc && (
+                           {email.cc && (
                             <div>
                               <p className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider">CC</p>
                               <p className="text-sm text-[#64748b]">{email.cc}</p>
@@ -488,6 +491,12 @@ export default function EmailMonitoringPage() {
                             <div>
                               <p className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider">BCC</p>
                               <p className="text-sm text-[#64748b]">{email.bcc}</p>
+                            </div>
+                          )}
+                          {email.scheduledAt && (
+                            <div>
+                              <p className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider">Scheduled Send Time</p>
+                              <p className="text-sm text-[#1e293b] font-semibold">{new Date(email.scheduledAt).toLocaleString()}</p>
                             </div>
                           )}
 
@@ -739,6 +748,12 @@ export default function EmailMonitoringPage() {
                                     <p className="text-sm text-[#475569]">{email.bcc}</p>
                                   </div>
                                 )}
+                                {email.scheduledAt && (
+                                  <div className="space-y-1 col-span-2">
+                                    <p className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider">Scheduled Send Time</p>
+                                    <p className="text-sm font-bold text-indigo-600">{new Date(email.scheduledAt).toLocaleString()}</p>
+                                  </div>
+                                )}
 
                                 {(() => {
                                   const matchedProjects = getMatchedProjectsForEmail(email);
@@ -896,6 +911,20 @@ export default function EmailMonitoringPage() {
                               <div className="p-6 bg-emerald-50 rounded-2xl border border-emerald-100 flex items-center gap-4 text-emerald-700">
                                 <CheckCircle className="w-6 h-6" />
                                 <p className="text-sm font-medium">This email has been successfully delivered.</p>
+                              </div>
+                            )}
+
+                            {email.status === 'SCHEDULED' && (
+                              <div className="p-6 bg-blue-50 rounded-2xl border border-blue-100 flex items-center gap-4 text-blue-700">
+                                <Clock className="w-6 h-6" />
+                                <p className="text-sm font-medium">This email is approved and scheduled to send on {new Date(email.scheduledAt!).toLocaleString()}.</p>
+                              </div>
+                            )}
+
+                            {email.status === 'FAILED' && (
+                              <div className="p-6 bg-rose-50 rounded-2xl border border-rose-100 flex items-center gap-4 text-rose-700">
+                                <XCircle className="w-6 h-6" />
+                                <p className="text-sm font-medium">This email failed to send: {email.adminComment || 'SMTP error'}</p>
                               </div>
                             )}
  

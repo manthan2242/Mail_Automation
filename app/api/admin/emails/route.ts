@@ -29,7 +29,7 @@ export async function GET() {
 
 export async function PATCH(request: Request) {
   try {
-    const { id, status, adminComment, subject, body, to, cc, bcc } = await request.json();
+    const { id, status, adminComment, subject, body, to, cc, bcc, scheduledAt } = await request.json();
     
     // Validate email exists and get employee details
     const emailData = await prisma.email.findUnique({
@@ -58,8 +58,10 @@ export async function PATCH(request: Request) {
       }
     }
 
+    const finalScheduledAt = scheduledAt !== undefined ? scheduledAt : emailData.scheduledAt;
     const isApproved = status === 'APPROVED';
-    const targetStatus = isApproved ? 'SENT' : status;
+    const isScheduled = isApproved && finalScheduledAt && new Date(finalScheduledAt).getTime() > Date.now();
+    const targetStatus = isScheduled ? 'SCHEDULED' : (isApproved ? 'SENT' : status);
 
     // Update the email
     const updatedEmail = await prisma.email.update({
@@ -72,12 +74,13 @@ export async function PATCH(request: Request) {
         ...(body && { body }),
         ...(to !== undefined && { to }),
         ...(cc !== undefined && { cc }),
-        ...(bcc !== undefined && { bcc })
+        ...(bcc !== undefined && { bcc }),
+        ...(scheduledAt !== undefined && { scheduledAt: scheduledAt ? new Date(scheduledAt) : null })
       },
     });
 
-    // If approved, send the email immediately via Nodemailer and track targets (asynchronously)
-    if (isApproved) {
+    // If approved and NOT scheduled for future, send the email immediately via Nodemailer and track targets (asynchronously)
+    if (isApproved && !isScheduled) {
       const resolvedTo = to || emailData.to;
       const resolvedSubject = subject || emailData.subject;
       const resolvedBody = body || emailData.body;
@@ -129,10 +132,18 @@ export async function PATCH(request: Request) {
 
     // Notify employee of status change (asynchronously)
     if (emailData.employee?.email) {
+      const subjectLine = isScheduled 
+        ? `Request Approved & Scheduled: ${updatedEmail.subject}` 
+        : `Request ${isApproved ? 'Approved & Sent' : 'Rejected'}: ${updatedEmail.subject}`;
+        
+      const bodyText = isScheduled
+        ? `Hi ${emailData.employee.name},\n\nYour request for "${updatedEmail.subject}" has been approved and scheduled to send on ${new Date(emailData.scheduledAt!).toLocaleString()}.${adminComment ? `\n\nAdmin Note: ${adminComment}` : ''}`
+        : `Hi ${emailData.employee.name},\n\nYour request for "${updatedEmail.subject}" has been ${isApproved ? 'approved and sent' : 'rejected'}.${adminComment ? `\n\nAdmin Note: ${adminComment}` : ''}`;
+
       sendEmail(
         emailData.employee.email,
-        `Request ${isApproved ? 'Approved & Sent' : 'Rejected'}: ${updatedEmail.subject}`,
-        `Hi ${emailData.employee.name},\n\nYour request for "${updatedEmail.subject}" has been ${isApproved ? 'approved and sent' : 'rejected'}.${adminComment ? `\n\nAdmin Note: ${adminComment}` : ''}`,
+        subjectLine,
+        bodyText,
         { noBcc: true }
       ).catch((e: any) => {
         console.warn('[NOTIFY ERROR]: Status notification failed', e);
@@ -146,5 +157,29 @@ export async function PATCH(request: Request) {
       error: 'Failed to update email',
       details: error.message 
     }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: Request) {
+  try {
+    const token = request.headers.get('authorization')?.split(' ')[1];
+    if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    const payload = await verifyToken(token);
+    if (!payload || payload.role !== 'admin') {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+    const { id } = await request.json();
+    if (!id) return NextResponse.json({ error: 'ID is required' }, { status: 400 });
+
+    await prisma.email.delete({
+      where: { id }
+    });
+
+    return NextResponse.json({ success: true });
+  } catch (error: any) {
+    console.error('Email DELETE Error:', error);
+    return NextResponse.json({ error: 'Failed to delete email', details: error.message }, { status: 500 });
   }
 }

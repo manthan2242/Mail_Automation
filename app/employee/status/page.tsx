@@ -6,7 +6,7 @@ import DashboardLayout from '@/components/layout/DashboardLayout';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Clock, CheckCircle, XCircle, Eye, Send, CheckCircle2, MailOpen, MousePointerClick, Reply, AlertTriangle, ShieldAlert, UserMinus, Mail, Paperclip } from 'lucide-react';
+import { Clock, CheckCircle, XCircle, Eye, Send, CheckCircle2, MailOpen, MousePointerClick, Reply, AlertTriangle, ShieldAlert, UserMinus, Mail, Paperclip, Calendar } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { toast } from 'sonner';
@@ -18,13 +18,14 @@ interface Email {
   id: string;
   subject: string;
   body: string;
-  status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'SENT';
+  status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'SENT' | 'SCHEDULED' | 'FAILED';
   adminComment?: string;
   createdAt: string;
   to?: string;
   cc?: string;
   bcc?: string;
   attachments?: string;
+  scheduledAt?: string;
   employee?: { name: string; email: string };
 }
 
@@ -54,7 +55,7 @@ const statusLegend = [
   { term: 'Unsubscribed', desc: 'User opted out', icon: UserMinus, color: 'text-slate-500', bg: 'bg-slate-50' },
 ];
 
-type FilterStatus = 'ALL' | 'CLIENTS' | 'PENDING' | 'APPROVED' | 'REJECTED' | 'SENT';
+type FilterStatus = 'ALL' | 'CLIENTS' | 'PENDING' | 'APPROVED' | 'REJECTED' | 'SENT' | 'SCHEDULED' | 'FAILED';
 
 export default function StatusTrackingPage() {
   const [emails, setEmails] = useState<Email[]>([]);
@@ -230,6 +231,8 @@ export default function StatusTrackingPage() {
     APPROVED: emails.filter(e => e.status === 'APPROVED').length,
     REJECTED: emails.filter(e => e.status === 'REJECTED').length,
     SENT: emails.filter(e => e.status === 'SENT').length,
+    SCHEDULED: emails.filter(e => e.status === 'SCHEDULED').length,
+    FAILED: emails.filter(e => e.status === 'FAILED').length,
   };
 
   const filterTabs: { key: FilterStatus; label: string; icon: any; activeClass: string; countClass: string }[] = [
@@ -239,6 +242,8 @@ export default function StatusTrackingPage() {
     { key: 'APPROVED', label: 'Approved', icon: CheckCircle, activeClass: 'bg-emerald-500 text-white border-emerald-500', countClass: 'bg-white/20 text-white' },
     { key: 'REJECTED', label: 'Rejected', icon: XCircle, activeClass: 'bg-rose-500 text-white border-rose-500', countClass: 'bg-white/20 text-white' },
     { key: 'SENT', label: 'Sent', icon: Send, activeClass: 'bg-blue-500 text-white border-blue-500', countClass: 'bg-white/20 text-white' },
+    { key: 'SCHEDULED', label: 'Scheduled', icon: Calendar, activeClass: 'bg-blue-500 text-white border-blue-500', countClass: 'bg-white/20 text-white' },
+    { key: 'FAILED', label: 'Failed', icon: XCircle, activeClass: 'bg-rose-500 text-white border-rose-500', countClass: 'bg-white/20 text-white' },
   ];
 
   const getStatusBadge = (status: string) => {
@@ -246,7 +251,9 @@ export default function StatusTrackingPage() {
       case 'PENDING': return <Badge variant="outline" className="bg-amber-50 text-amber-600 border-amber-200"><Clock className="w-3 h-3 mr-1" /> Pending</Badge>;
       case 'APPROVED': return <Badge variant="outline" className="bg-emerald-50 text-emerald-600 border-emerald-200"><CheckCircle className="w-3 h-3 mr-1" /> Approved</Badge>;
       case 'REJECTED': return <Badge variant="outline" className="bg-rose-50 text-rose-600 border-rose-200"><XCircle className="w-3 h-3 mr-1" /> Rejected</Badge>;
-      case 'SENT': return <Badge variant="outline" className="bg-blue-50 text-blue-600 border-blue-200"><Send className="w-3 h-3 mr-1" /> Sent</Badge>;
+      case 'SENT': return <Badge variant="outline" className="bg-[#eef2ff] text-[#6366f1] border-[#c7d2fe]"><Send className="w-3 h-3 mr-1" /> Sent</Badge>;
+      case 'SCHEDULED': return <Badge variant="outline" className="bg-blue-50 text-blue-600 border-blue-200"><Calendar className="w-3 h-3 mr-1" /> Scheduled</Badge>;
+      case 'FAILED': return <Badge variant="outline" className="bg-rose-50 text-rose-600 border-rose-200"><XCircle className="w-3 h-3 mr-1" /> Failed</Badge>;
       default: return <Badge>{status}</Badge>;
     }
   };
@@ -407,6 +414,12 @@ export default function StatusTrackingPage() {
                                     <div className="col-span-2">
                                       <p className="text-xs font-bold text-[#64748b] uppercase tracking-wider">BCC</p>
                                       <p className="text-xs text-[#475569]">{email.bcc}</p>
+                                    </div>
+                                  )}
+                                  {email.scheduledAt && (
+                                    <div className="col-span-2">
+                                      <p className="text-xs font-bold text-[#64748b] uppercase tracking-wider">Scheduled Send Time</p>
+                                      <p className="text-sm font-semibold text-[#1e293b]">{new Date(email.scheduledAt).toLocaleString()}</p>
                                     </div>
                                   )}
                                   {(() => {

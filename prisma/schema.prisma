@@ -94,6 +94,7 @@ model Email {
   configId      String?
   adminComment  String?
   attachments   String?
+  scheduledAt   DateTime?
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
   config        EmailConfig? @relation(fields: [configId], references: [id], onDelete: Cascade)
