@@ -178,16 +178,20 @@ export default function EmployeeSchedulerPage() {
       <div className="space-y-10">
         <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="page-title">
-            <h1 className="text-3xl font-bold text-[#1e293b] tracking-tight">Email Scheduler</h1>
-            <p className="text-[#64748b] mt-1">Manage and track your scheduled email dispatches.</p>
+            <h1 className="text-2xl md:text-3xl font-bold text-[#1e293b] tracking-tight">Email Scheduler</h1>
+            <p className="text-xs md:text-sm text-[#64748b] mt-1">Manage and track your scheduled email dispatches.</p>
           </div>
           <div className="header-actions flex gap-3">
-            <Button variant="outline" onClick={fetchScheduledEmails} className="bg-white border-[#e2e8f0] text-[#1e293b] rounded-lg px-5 h-10 font-semibold shadow-sm hover:bg-slate-50">
+            <Button 
+              variant="outline" 
+              onClick={fetchScheduledEmails} 
+              className="hidden md:inline-flex bg-white border-[#e2e8f0] text-[#1e293b] rounded-lg px-5 h-10 font-semibold shadow-sm hover:bg-slate-50"
+            >
               Refresh
             </Button>
             <Button 
               onClick={() => setIsComposeOpen(true)}
-              className="bg-[#6366f1] hover:bg-[#4f46e5] text-white rounded-lg px-5 h-10 font-semibold shadow-sm shadow-indigo-100"
+              className="hidden md:inline-flex bg-[#6366f1] hover:bg-[#4f46e5] text-white rounded-lg px-5 h-10 font-semibold shadow-sm shadow-indigo-100"
             >
               <Send className="w-4 h-4 mr-2" />
               Schedule Email
@@ -195,8 +199,36 @@ export default function EmployeeSchedulerPage() {
           </div>
         </header>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {/* Mobile Stats Row (Visible only on mobile) */}
+        <div className="grid grid-cols-3 gap-2 md:hidden">
+          <div className="bg-white border border-[#e2e8f0] p-3 rounded-xl flex flex-col items-center justify-center text-center shadow-sm">
+            <span className="text-[9px] font-bold text-[#64748b] uppercase tracking-wider line-clamp-1">
+              Approved
+            </span>
+            <span className="text-base font-bold text-[#1e293b] mt-0.5">
+              {totalActive}
+            </span>
+          </div>
+          <div className="bg-white border border-[#e2e8f0] p-3 rounded-xl flex flex-col items-center justify-center text-center shadow-sm">
+            <span className="text-[9px] font-bold text-[#64748b] uppercase tracking-wider line-clamp-1">
+              Next 24h
+            </span>
+            <span className="text-base font-bold text-[#1e293b] mt-0.5">
+              {next24Hrs}
+            </span>
+          </div>
+          <div className="bg-white border border-[#e2e8f0] p-3 rounded-xl flex flex-col items-center justify-center text-center shadow-sm">
+            <span className="text-[9px] font-bold text-[#64748b] uppercase tracking-wider line-clamp-1">
+              Pending
+            </span>
+            <span className="text-base font-bold text-[#1e293b] mt-0.5">
+              {totalPending}
+            </span>
+          </div>
+        </div>
+
+        {/* Desktop Stats Cards */}
+        <div className="hidden md:grid grid-cols-3 gap-6">
           <Card className="border border-[#e2e8f0] shadow-sm bg-white rounded-2xl">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-xs font-bold text-[#64748b] uppercase tracking-wider">Approved & Scheduled</CardTitle>
@@ -235,11 +267,11 @@ export default function EmployeeSchedulerPage() {
             <Table>
               <TableHeader>
                 <TableRow className="bg-[#fafafa] hover:bg-[#fafafa]">
-                  <TableHead className="px-8 py-4 text-[11px] font-bold text-[#64748b] uppercase tracking-wider">Recipient</TableHead>
-                  <TableHead className="px-8 py-4 text-[11px] font-bold text-[#64748b] uppercase tracking-wider">Subject</TableHead>
-                  <TableHead className="px-8 py-4 text-[11px] font-bold text-[#64748b] uppercase tracking-wider">Scheduled Time</TableHead>
-                  <TableHead className="px-8 py-4 text-[11px] font-bold text-[#64748b] uppercase tracking-wider">Status</TableHead>
-                  <TableHead className="px-8 py-4 text-[11px] font-bold text-[#64748b] uppercase tracking-wider text-right">Actions</TableHead>
+                  <TableHead className="px-3 md:px-4 py-3 md:py-4 text-[11px] font-bold text-[#64748b] uppercase tracking-wider">Recipient</TableHead>
+                  <TableHead className="px-3 md:px-4 py-3 md:py-4 text-[11px] font-bold text-[#64748b] uppercase tracking-wider">Subject</TableHead>
+                  <TableHead className="px-3 md:px-4 py-3 md:py-4 text-[11px] font-bold text-[#64748b] uppercase tracking-wider">Scheduled Time</TableHead>
+                  <TableHead className="px-3 md:px-4 py-3 md:py-4 text-[11px] font-bold text-[#64748b] uppercase tracking-wider">Status</TableHead>
+                  <TableHead className="px-3 md:px-4 py-3 md:py-4 text-[11px] font-bold text-[#64748b] uppercase tracking-wider text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -250,13 +282,21 @@ export default function EmployeeSchedulerPage() {
                 ) : (
                   emails.map((email) => (
                     <TableRow key={email.id} className="hover:bg-slate-50/50 border-b border-[#e2e8f0] transition-colors">
-                      <TableCell className="px-8 py-5 text-sm text-[#1e293b] font-semibold">{email.to}</TableCell>
-                      <TableCell className="px-8 py-5 max-w-xs truncate text-sm font-medium text-[#1e293b]">{email.subject}</TableCell>
-                      <TableCell className="px-8 py-5 text-sm text-[#475569] font-medium">
+                      <TableCell className="px-3 md:px-4 py-3 md:py-5">
+                        <div className="flex flex-col gap-1 max-w-[120px] md:max-w-[180px]">
+                          {email.to.split(',').map((recipient, i) => (
+                            <div key={i} className="text-sm text-[#1e293b] font-semibold truncate break-all" title={recipient.trim()}>
+                              {recipient.trim()}
+                            </div>
+                          ))}
+                        </div>
+                      </TableCell>
+                      <TableCell className="px-3 md:px-4 py-3 md:py-5 max-w-[120px] md:max-w-[180px] truncate text-sm font-medium text-[#1e293b]" title={email.subject}>{email.subject}</TableCell>
+                      <TableCell className="px-3 md:px-4 py-3 md:py-5 text-sm text-[#475569] font-medium whitespace-nowrap">
                         {email.scheduledAt ? new Date(email.scheduledAt).toLocaleString() : 'Not Scheduled'}
                       </TableCell>
-                      <TableCell className="px-8 py-5">{getStatusBadge(email.status)}</TableCell>
-                      <TableCell className="px-8 py-5 text-right">
+                      <TableCell className="px-3 md:px-4 py-3 md:py-5">{getStatusBadge(email.status)}</TableCell>
+                      <TableCell className="px-3 md:px-4 py-3 md:py-5 text-right">
                         <div className="flex justify-end space-x-1">
                           <Dialog open={selectedEmail?.id === email.id && !isRescheduleOpen} onOpenChange={(open) => {
                             if (!open) setSelectedEmail(null);
@@ -274,30 +314,68 @@ export default function EmployeeSchedulerPage() {
                                 <DialogTitle className="text-xl font-bold text-[#1e293b]">Scheduled Email Details</DialogTitle>
                               </DialogHeader>
                               <div className="p-8 space-y-6 max-h-[80vh] overflow-y-auto">
-                                <div className="grid grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                   <div>
-                                    <p className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider">Recipient</p>
-                                    <p className="text-sm font-semibold text-indigo-600">{email.to}</p>
+                                    <p className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider">From Email</p>
+                                    <p className="text-sm font-medium text-slate-700 break-all">{email.fromEmail || 'Default SMTP'}</p>
                                   </div>
+                                  <div>
+                                    <p className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider">Recipient (To)</p>
+                                    <div className="flex flex-col gap-1 mt-1">
+                                      {email.to.split(',').map((recipient, i) => (
+                                        <p key={i} className="text-sm font-semibold text-indigo-600 break-all">
+                                          {recipient.trim()}
+                                        </p>
+                                      ))}
+                                    </div>
+                                  </div>
+                                </div>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                   <div>
                                     <p className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider">Scheduled Time</p>
                                     <p className="text-sm text-[#1e293b] font-medium">
                                       {email.scheduledAt ? new Date(email.scheduledAt).toLocaleString() : '-'}
                                     </p>
                                   </div>
-                                </div>
-                                <div className="grid grid-cols-2 gap-4">
                                   <div>
                                     <p className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider">Status</p>
                                     <div>{getStatusBadge(email.status)}</div>
                                   </div>
-                                  {email.adminComment && (
-                                    <div>
-                                      <p className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider">Admin Comment</p>
-                                      <p className="text-sm text-rose-600 italic font-semibold">{email.adminComment}</p>
-                                    </div>
-                                  )}
                                 </div>
+                                {(email.cc || email.bcc) && (
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    {email.cc && (
+                                      <div>
+                                        <p className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider">Cc</p>
+                                        <div className="flex flex-col gap-1 mt-1">
+                                          {email.cc.split(',').map((ccEmail, i) => (
+                                            <p key={i} className="text-sm text-slate-600 break-all">
+                                              {ccEmail.trim()}
+                                            </p>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    )}
+                                    {email.bcc && (
+                                      <div>
+                                        <p className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider">Bcc</p>
+                                        <div className="flex flex-col gap-1 mt-1">
+                                          {email.bcc.split(',').map((bccEmail, i) => (
+                                            <p key={i} className="text-sm text-slate-600 break-all">
+                                              {bccEmail.trim()}
+                                            </p>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                                {email.adminComment && (
+                                  <div className="p-4 bg-rose-50 border border-rose-100 rounded-xl space-y-1">
+                                    <p className="text-[10px] font-bold text-rose-700 uppercase tracking-wider">Admin Comment</p>
+                                    <p className="text-sm text-rose-800 italic font-semibold">{email.adminComment}</p>
+                                  </div>
+                                )}
                                 <div className="p-4 bg-[#f8fafc] rounded-xl border border-[#e2e8f0] space-y-2">
                                   <p className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider">Subject</p>
                                   <p className="text-sm font-bold text-[#1e293b]">{email.subject}</p>
@@ -399,6 +477,15 @@ export default function EmployeeSchedulerPage() {
           </div>
         </div>
       )}
+
+      {/* Mobile Schedule Email Floating Button (Bottom Right) */}
+      <Button
+        onClick={() => setIsComposeOpen(true)}
+        className="md:hidden fixed bottom-[76px] right-4 z-40 bg-[#6366f1] hover:bg-[#4f46e5] text-white rounded-2xl h-10 px-4 font-bold shadow-[0_8px_20px_-4px_rgba(99,102,241,0.6)] flex items-center justify-center gap-1.5 active:scale-95 transition-all"
+      >
+        <Send className="w-4 h-4" />
+        Schedule Email
+      </Button>
 
       {isComposeOpen && <ComposeModal onClose={() => { setIsComposeOpen(false); fetchScheduledEmails(); }} forceSchedule={true} />}
     </DashboardLayout>

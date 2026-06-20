@@ -132,8 +132,8 @@ export default function EmailConfigsPage() {
       <div className="space-y-10">
         <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="page-title">
-            <h1 className="text-3xl font-bold text-[#1e293b] tracking-tight">SMTP Configurations</h1>
-            <p className="text-[#64748b] mt-1">Manage email accounts used for sending approvals and OTPs.</p>
+            <h1 className="text-2xl md:text-3xl font-bold text-[#1e293b] tracking-tight">SMTP Configurations</h1>
+            <p className="text-xs md:text-sm text-[#64748b] mt-1">Manage email accounts used for sending approvals and OTPs.</p>
           </div>
           <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
             <DialogTrigger

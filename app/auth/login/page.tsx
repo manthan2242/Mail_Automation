@@ -19,12 +19,50 @@ export default function LoginPage() {
   const { login, user } = useAuth();
   const router = useRouter();
 
-  // Removed conflicting useEffect that bypasses OTP and change password
+  const handleEmailChange = (val: string) => {
+    // Strip all spaces and characters that are not standard email characters
+    const sanitized = val.replace(/[^a-zA-Z0-9._+@-]/g, '');
+    setEmail(sanitized);
+  };
+
+  const handleEmailKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    const allowedKeys = [
+      'Backspace', 'Delete', 'Tab', 'Escape', 'Enter', 
+      'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 
+      'Home', 'End'
+    ];
+    
+    // Allow standard control key combinations (like Ctrl+A, Ctrl+C, Ctrl+V, etc.)
+    if (e.ctrlKey || e.metaKey || allowedKeys.includes(e.key)) {
+      return;
+    }
+
+    // Block spaces
+    if (e.key === ' ') {
+      e.preventDefault();
+      return;
+    }
+
+    // Only allow standard email characters: alphanumeric and . _ + @ -
+    const emailCharRegex = /^[a-zA-Z0-9._+@-]+$/;
+    if (e.key.length === 1 && !emailCharRegex.test(e.key)) {
+      e.preventDefault();
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    const cleanEmail = email.trim().replace(/\s/g, '');
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    
+    if (!emailRegex.test(cleanEmail)) {
+      toast.error('Please enter a valid email address (e.g. user@domain.com) without spaces or invalid characters.');
+      return;
+    }
+
     setLoading(true);
-    const result = await login(email, password, role);
+    const result = await login(cleanEmail, password, role);
     setLoading(false);
     if (!result.success) {
       toast.error(result.error || 'Login failed');
@@ -58,7 +96,8 @@ export default function LoginPage() {
                   type="email"
                   placeholder="name@example.com"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(e) => handleEmailChange(e.target.value)}
+                  onKeyDown={handleEmailKeyDown}
                   required
                   className="h-12 rounded-xl border-[#e2e8f0] focus:ring-[#6366f1] bg-white"
                 />

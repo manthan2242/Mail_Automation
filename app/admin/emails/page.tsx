@@ -18,6 +18,7 @@ import { motion } from 'motion/react';
 import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 import ComposeModal from '@/components/dashboard/ComposeModal';
+import DOMPurify from 'dompurify';
 
 interface Email {
   id: string;
@@ -31,6 +32,7 @@ interface Email {
   employee?: { name: string; email: string };
   adminComment?: string;
   configId?: string;
+  config?: { email: string };
   attachments?: string;
   scheduledAt?: string;
   createdAt: string;
@@ -89,6 +91,30 @@ export default function EmailMonitoringPage() {
         return (match ? match[1] : clean).trim().toLowerCase();
       })
       .filter(Boolean);
+  };
+
+  // Helper to convert HTML body from database to plain text with carriage returns for textarea editing
+  const htmlToText = (html: string): string => {
+    if (!html) return '';
+    let text = html;
+    text = text.replace(/<br\s*\/?>/gi, '\n');
+    text = text.replace(/<\/p>/gi, '\n');
+    text = text.replace(/<\/div>/gi, '\n');
+    text = text.replace(/<[^>]+>/g, '');
+    text = text
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&amp;/g, '&')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'");
+    return text;
+  };
+
+  // Helper to convert plain text with carriage returns back to HTML format
+  const textToHtml = (text: string): string => {
+    if (!text) return '';
+    return text.replace(/\n/g, '<br/>');
   };
 
   // Helper to find a Client record matching a given email address
@@ -254,7 +280,7 @@ export default function EmailMonitoringPage() {
         body: JSON.stringify({ 
           id: selectedEmail?.id, 
           subject: editDraftData.subject,
-          body: editDraftData.body,
+          body: textToHtml(editDraftData.body),
           to: editDraftData.to,
           cc: editDraftData.cc || null,
           bcc: editDraftData.bcc || null
@@ -291,8 +317,8 @@ export default function EmailMonitoringPage() {
         },
         body: JSON.stringify({ 
           emailId, 
-          fromEmail: configs.find(c => c.id === selectedFromEmail)?.email,
-          configId: selectedFromEmail
+          fromEmail: selectedFromEmail,
+          configId: configs.find(c => c.email === selectedFromEmail)?.id
         }),
       });
       const data = await res.json();
@@ -326,13 +352,13 @@ export default function EmailMonitoringPage() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-10">
+      <div className="space-y-6 md:space-y-10">
         <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="page-title">
-            <h1 className="text-3xl font-bold text-[#1e293b] tracking-tight">Email Monitoring</h1>
-            <p className="text-[#64748b] mt-1">Review and approve team member email requests.</p>
+            <h1 className="text-2xl md:text-3xl font-bold text-[#1e293b] tracking-tight">Email Monitoring</h1>
+            <p className="text-xs md:text-sm text-[#64748b] mt-1">Review and approve team member email requests.</p>
           </div>
-          <div className="header-actions flex gap-3">
+          <div className="header-actions hidden md:flex gap-3">
             <Button variant="outline" onClick={fetchData} className="bg-white border-[#e2e8f0] text-[#1e293b] rounded-lg px-5 h-10 font-semibold shadow-sm hover:bg-slate-50">
               Refresh
             </Button>
@@ -347,11 +373,11 @@ export default function EmailMonitoringPage() {
         </header>
 
         {/* Filter Tabs */}
-        <div className="flex border-b border-[#e2e8f0] gap-6">
+        <div className="flex w-full border-b border-[#e2e8f0] md:gap-6">
           <button
             onClick={() => setActiveFilter('all')}
             className={cn(
-              "pb-4 text-sm font-semibold transition-all relative",
+              "flex-1 md:flex-none text-center pb-4 text-sm font-semibold transition-all relative",
               activeFilter === 'all' 
                 ? "text-[#6366f1] border-b-2 border-[#6366f1]" 
                 : "text-[#64748b] hover:text-[#1e293b]"
@@ -362,7 +388,7 @@ export default function EmailMonitoringPage() {
           <button
             onClick={() => setActiveFilter('clients-only')}
             className={cn(
-              "pb-4 text-sm font-semibold transition-all relative",
+              "flex-1 md:flex-none text-center pb-4 text-sm font-semibold transition-all relative",
               activeFilter === 'clients-only' 
                 ? "text-[#6366f1] border-b-2 border-[#6366f1]" 
                 : "text-[#64748b] hover:text-[#1e293b]"
@@ -394,245 +420,24 @@ export default function EmailMonitoringPage() {
           </div>
         )}
 
-        {/* Mobile Email List (Visible only on mobile) */}
-        <div className="block md:hidden">
-          {loading ? (
-            <div className="text-center py-12 text-[#64748b]">Loading emails...</div>
-          ) : getFilteredEmails().length === 0 ? (
-            <div className="text-center py-12 text-[#64748b]">No emails found.</div>
-          ) : (
-            <div className="bg-white border-y border-[#e2e8f0] divide-y divide-[#e2e8f0]">
-              {getFilteredEmails().map((email) => (
-                <div key={email.id} className="p-4 flex items-center justify-between hover:bg-slate-50 transition-colors">
-                  <div className="flex-1 min-w-0 mr-4">
-                    <div className="flex items-center gap-2 mb-1">
-                      <div className="w-5 h-5 rounded-full bg-[#f1f5f9] flex items-center justify-center text-[#6366f1] text-[10px] font-bold">
-                        {email.employee ? email.employee.name[0] : 'A'}
-                      </div>
-                      <span className="text-xs font-bold text-[#1e293b] truncate">
-                        {email.employee ? email.employee.name : 'Admin'}
-                      </span>
-                      {getStatusBadge(email.status)}
-                    </div>
-                    {/* Display Recipient (To) and Client Badge in Mobile */}
-                    <div className="mb-1 text-xs text-[#1e293b] truncate">
-                      <span className="font-semibold text-[#64748b]">To: </span>
-                      {email.to || 'N/A'}
-                    </div>
-                    {email.to && (() => {
-                      const toEmails = getEmailsFromString(email.to);
-                      const ccEmails = getEmailsFromString(email.cc);
-                      const bccEmails = getEmailsFromString(email.bcc);
-                      const allEmails = [...toEmails, ...ccEmails, ...bccEmails];
-                      const matchedClients = Array.from(new Set(
-                        allEmails
-                          .map(emailStr => getClientForEmail(emailStr))
-                          .filter((c): c is Client => !!c)
-                          .map(c => JSON.stringify({ id: c.id, name: c.name }))
-                      )).map(s => JSON.parse(s) as { id: string; name: string });
-
-                      if (matchedClients.length > 0) {
-                        return (
-                          <div className="flex flex-wrap gap-1 mb-2">
-                            {matchedClients.map(c => (
-                              <Badge key={c.id} variant="outline" className="bg-indigo-50 text-indigo-600 border-indigo-100 text-[9px] py-0 px-1 font-medium">
-                                Client: {c.name}
-                              </Badge>
-                            ))}
-                          </div>
-                        );
-                      }
-                      return null;
-                    })()}
-                    <p className="text-sm font-medium text-[#64748b] truncate italic">
-                      &quot;{email.subject}&quot;
-                    </p>
-                  </div>
-                  
-                  <Dialog open={isActionOpen && selectedEmail?.id === email.id} onOpenChange={(open) => {
-                    setIsActionOpen(open);
-                    if (open) {
-                      setSelectedEmail(email);
-                      setAdminComment(email.adminComment || '');
-                      setSelectedFromEmail(email.configId || '');
-                    }
-                  }}>
-                    <DialogTrigger
-                      render={
-                        <Button variant="ghost" size="icon" className="text-[#6366f1] bg-indigo-50 rounded-full h-10 w-10 flex-shrink-0">
-                          <Eye className="w-4 h-4" />
-                        </Button>
-                      }
-                    />
-                    <DialogContent className="w-[95vw] max-w-[600px] bg-white rounded-[24px] border-none shadow-2xl p-0 overflow-hidden">
-                      <DialogHeader className="px-6 py-4 bg-[#f8fafc] border-b border-[#e2e8f0]">
-                        <DialogTitle className="text-lg font-bold text-[#1e293b]">Review Request</DialogTitle>
-                      </DialogHeader>
-                      <div className="p-6 space-y-6 max-h-[80vh] overflow-y-auto">
-                        <div className="space-y-4">
-                          <div className="grid grid-cols-2 gap-4">
-                            <div>
-                              <p className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider">Team Member</p>
-                              <p className="text-sm font-semibold text-[#1e293b]">{email.employee?.name || 'Admin'}</p>
-                            </div>
-                            <div>
-                              <p className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider">Recipient (To)</p>
-                              <p className="text-sm text-[#64748b] font-bold">{email.to}</p>
-                            </div>
-                          </div>
-                          
-                           {email.cc && (
-                            <div>
-                              <p className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider">CC</p>
-                              <p className="text-sm text-[#64748b]">{email.cc}</p>
-                            </div>
-                          )}
-                          {email.bcc && (
-                            <div>
-                              <p className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider">BCC</p>
-                              <p className="text-sm text-[#64748b]">{email.bcc}</p>
-                            </div>
-                          )}
-                          {email.scheduledAt && (
-                            <div>
-                              <p className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider">Scheduled Send Time</p>
-                              <p className="text-sm text-[#1e293b] font-semibold">{new Date(email.scheduledAt).toLocaleString()}</p>
-                            </div>
-                          )}
-
-                          {(() => {
-                            const matchedProjects = getMatchedProjectsForEmail(email);
-                            if (matchedProjects.length > 0) {
-                              return (
-                                <div>
-                                  <p className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider">Project</p>
-                                  <div className="flex flex-wrap gap-1.5 mt-1">
-                                    {matchedProjects.map((mp, i) => (
-                                      <Badge key={i} variant="outline" className="bg-[#eef2ff] text-[#4f46e5] border-[#c7d2fe] text-[11px] font-semibold px-1.5 py-0.5">
-                                        {mp.projectName} ({mp.clientName})
-                                      </Badge>
-                                    ))}
-                                  </div>
-                                </div>
-                              );
-                            }
-                            return null;
-                          })()}
-
-                          {email.attachments && (() => {
-                            try {
-                              const atts = JSON.parse(email.attachments);
-                              if (Array.isArray(atts) && atts.length > 0) {
-                                return (
-                                  <div className="pt-2 border-t border-[#e2e8f0]">
-                                    <p className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider mb-2">Attachments ({atts.length})</p>
-                                    <div className="flex flex-wrap gap-2">
-                                      {atts.map((att: any, idx: number) => (
-                                        <a
-                                          key={idx}
-                                          href={att.content}
-                                          download={att.filename}
-                                          className="flex items-center gap-1.5 bg-[#f1f5f9] hover:bg-[#e2e8f0] text-[#475569] text-xs font-semibold px-2.5 py-1 rounded-lg border border-[#e2e8f0] transition-colors"
-                                        >
-                                          <Paperclip className="w-3 h-3" />
-                                          <span className="truncate max-w-[120px]">{att.filename}</span>
-                                        </a>
-                                      ))}
-                                    </div>
-                                  </div>
-                                );
-                              }
-                            } catch (e) {}
-                            return null;
-                          })()}
-
-                          <div className="p-4 bg-[#f8fafc] rounded-xl border border-[#e2e8f0] space-y-3">
-                            <div className="flex justify-between items-center">
-                              <p className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider">Subject</p>
-                              <Button 
-                                type="button"
-                                variant="ghost" 
-                                size="sm" 
-                                className="h-6 text-[10px] font-bold text-[#6366f1] px-2"
-                                onClick={() => {
-                                  setEditDraftData({ 
-                                    subject: email.subject, 
-                                    body: email.body,
-                                    to: email.to || '',
-                                    cc: email.cc || '',
-                                    bcc: email.bcc || ''
-                                  });
-                                  setIsEditDraftOpen(true);
-                                }}
-                              >
-                                Edit
-                              </Button>
-                            </div>
-                            <p className="text-sm font-bold text-[#1e293b]">{email.subject}</p>
-                            <div className="pt-2 border-t border-[#e2e8f0]">
-                              <p className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider mb-2">Message Body</p>
-                              <div className="text-xs text-[#334155] italic whitespace-pre-wrap leading-relaxed">
-                                {email.body}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-
-                        {email.status === 'PENDING' && (
-                          <div className="space-y-4">
-                            <div className="space-y-2">
-                              <Label className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider">Admin Comment</Label>
-                              <Textarea 
-                                placeholder="Add optional feedback..." 
-                                value={adminComment}
-                                onChange={(e) => setAdminComment(e.target.value)}
-                                className="min-h-[80px] rounded-xl border-[#e2e8f0] text-sm"
-                              />
-                            </div>
-                            <div className="flex gap-3">
-                              <Button disabled={isSubmitting} className="flex-1 bg-[#22c55e] hover:bg-[#16a34a] text-white rounded-xl h-12 font-bold" onClick={() => handleAction('APPROVED')}>
-                                {isSubmitting ? '...' : 'Approve'}
-                              </Button>
-                              <Button disabled={isSubmitting} variant="outline" className="flex-1 border-rose-200 text-rose-600 rounded-xl h-12 font-bold" onClick={() => handleAction('REJECTED')}>
-                                {isSubmitting ? '...' : 'Reject'}
-                              </Button>
-                            </div>
-                          </div>
-                        )}
-
-                        {email.status === 'APPROVED' && (
-                          <Button 
-                            className="w-full bg-[#6366f1] text-white rounded-xl h-14 font-bold shadow-lg shadow-indigo-100"
-                            onClick={() => handleSendApproved(email.id)}
-                            disabled={sendLoading}
-                          >
-                            {sendLoading ? 'Sending...' : 'Send Now'}
-                          </Button>
-                        )}
-                        
-                        <div className="text-[10px] text-center text-[#94a3b8] pt-2">
-                          ID: {email.id.slice(0, 8)} • {new Date(email.createdAt).toLocaleString()}
-                        </div>
-                      </div>
-                    </DialogContent>
-                  </Dialog>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Desktop Email Table (Hidden on mobile) */}
-        <Card className="hidden md:block border border-[#e2e8f0] shadow-[0_2px_8px_rgba(0,0,0,0.04)] bg-white rounded-[24px] overflow-hidden">
+        {/* Email Table (Visible on mobile and desktop viewports) */}
+        <Card className="border border-[#e2e8f0] shadow-[0_2px_8px_rgba(0,0,0,0.04)] bg-white rounded-xl md:rounded-[24px] overflow-hidden">
+          <div className="overflow-x-auto w-full">
           <Table>
             <TableHeader>
               <TableRow className="bg-[#fafafa] hover:bg-[#fafafa]">
-                <TableHead className="px-8 py-4 text-[11px] font-bold text-[#64748b] uppercase tracking-wider">Team Member Name</TableHead>
-                <TableHead className="px-8 py-4 text-[11px] font-bold text-[#64748b] uppercase tracking-wider">Recipient (To)</TableHead>
-                <TableHead className="px-8 py-4 text-[11px] font-bold text-[#64748b] uppercase tracking-wider">Subject</TableHead>
-                <TableHead className="px-8 py-4 text-[11px] font-bold text-[#64748b] uppercase tracking-wider">Status</TableHead>
-                <TableHead className="px-8 py-4 text-[11px] font-bold text-[#64748b] uppercase tracking-wider">Date</TableHead>
-                <TableHead className="px-8 py-4 text-[11px] font-bold text-[#64748b] uppercase tracking-wider text-right">Actions</TableHead>
+                <TableHead className="px-3 md:px-8 py-4 text-[11px] font-bold text-[#64748b] uppercase tracking-wider">
+                  <span className="md:hidden">Sender</span>
+                  <span className="hidden md:inline">Team Member Name</span>
+                </TableHead>
+                <TableHead className="px-3 md:px-8 py-4 text-[11px] font-bold text-[#64748b] uppercase tracking-wider">
+                  <span className="md:hidden">Recipient</span>
+                  <span className="hidden md:inline">Recipient (To)</span>
+                </TableHead>
+                <TableHead className="px-3 md:px-8 py-4 text-[11px] font-bold text-[#64748b] uppercase tracking-wider">Subject</TableHead>
+                <TableHead className="px-3 md:px-8 py-4 text-[11px] font-bold text-[#64748b] uppercase tracking-wider">Status</TableHead>
+                <TableHead className="px-3 md:px-8 py-4 text-[11px] font-bold text-[#64748b] uppercase tracking-wider">Date</TableHead>
+                <TableHead className="px-3 md:px-8 py-4 text-[11px] font-bold text-[#64748b] uppercase tracking-wider text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -643,33 +448,33 @@ export default function EmailMonitoringPage() {
               ) : (
                 getFilteredEmails().map((email) => (
                   <TableRow key={email.id} className="hover:bg-slate-50/50 border-b border-[#e2e8f0] transition-colors">
-                    <TableCell className="px-8 py-5">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-[#e2e8f0] flex items-center justify-center text-[#64748b] text-[10px] font-bold">
+                    <TableCell className="px-3 md:px-8 py-3.5 md:py-5">
+                      <div className="flex items-center gap-1.5 md:gap-3">
+                        <div className="hidden sm:flex w-8 h-8 rounded-full bg-[#e2e8f0] items-center justify-center text-[#64748b] text-[10px] font-bold shrink-0">
                           {email.employee ? email.employee.name[0] : 'A'}
                         </div>
-                        <div className="flex flex-col">
-                          <span className="text-sm font-semibold text-[#1e293b]">
+                        <div className="flex flex-col min-w-0">
+                          <span className="text-xs md:text-sm font-semibold text-[#1e293b] truncate">
                             {email.employee ? email.employee.name : 'System Admin'}
                           </span>
-                          <span className="text-[10px] text-[#64748b]">
+                          <span className="text-[9px] md:text-[10px] text-[#64748b] truncate break-all max-w-[80px] md:max-w-none">
                             {email.employee ? email.employee.email : 'admin@system.com'}
                           </span>
                         </div>
                       </div>
                     </TableCell>
-                    <TableCell className="px-8 py-5">
-                      <div className="flex flex-col gap-1 max-w-[200px]">
-                        <span className="text-sm text-[#1e293b] truncate" title={email.to || ''}>
+                    <TableCell className="px-3 md:px-8 py-3.5 md:py-5">
+                      <div className="flex flex-col gap-1 max-w-[100px] md:max-w-[200px] min-w-0">
+                        <span className="text-xs md:text-sm text-[#1e293b] truncate break-all" title={email.to || ''}>
                           {email.to || 'N/A'}
                         </span>
                         {email.cc && (
-                          <span className="text-[10px] text-[#64748b] truncate" title={`CC: ${email.cc}`}>
+                          <span className="text-[9px] md:text-[10px] text-[#64748b] truncate break-all" title={`CC: ${email.cc}`}>
                             CC: {email.cc}
                           </span>
                         )}
                         {email.bcc && (
-                          <span className="text-[10px] text-[#64748b] truncate" title={`BCC: ${email.bcc}`}>
+                          <span className="text-[9px] md:text-[10px] text-[#64748b] truncate break-all" title={`BCC: ${email.bcc}`}>
                             BCC: {email.bcc}
                           </span>
                         )}
@@ -690,7 +495,7 @@ export default function EmailMonitoringPage() {
                             return (
                               <div className="flex flex-wrap gap-1 mt-1">
                                 {matchedClients.map(c => (
-                                  <Badge key={c.id} variant="outline" className="bg-indigo-50 text-indigo-600 border-indigo-100 text-[10px] py-0 px-1.5 font-medium">
+                                  <Badge key={c.id} variant="outline" className="bg-indigo-50 text-indigo-600 border-indigo-100 text-[9px] py-0 px-1 font-medium">
                                     Client: {c.name}
                                   </Badge>
                                 ))}
@@ -701,16 +506,23 @@ export default function EmailMonitoringPage() {
                         })()}
                       </div>
                     </TableCell>
-                    <TableCell className="px-8 py-5 max-w-xs truncate text-sm font-medium text-[#1e293b]">{email.subject}</TableCell>
-                    <TableCell className="px-8 py-5">{getStatusBadge(email.status)}</TableCell>
-                    <TableCell className="px-8 py-5 text-[#64748b] text-xs">{new Date(email.createdAt).toLocaleString()}</TableCell>
-                    <TableCell className="px-8 py-5 text-right">
+                    <TableCell className="px-3 md:px-8 py-3.5 md:py-5 max-w-[110px] md:max-w-xs text-xs md:text-sm font-medium text-[#1e293b] whitespace-normal break-words leading-tight">
+                      {email.subject}
+                    </TableCell>
+                    <TableCell className="px-3 md:px-8 py-3.5 md:py-5">{getStatusBadge(email.status)}</TableCell>
+                    <TableCell className="px-3 md:px-8 py-3.5 md:py-5 text-[#64748b] text-[10px] md:text-xs">
+                      <div className="flex flex-col font-medium">
+                        <span>{new Date(email.createdAt).toLocaleDateString()}</span>
+                        <span className="text-[9px] text-slate-400 mt-0.5">{new Date(email.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="px-3 md:px-8 py-3.5 md:py-5 text-right">
                       <Dialog open={isActionOpen && selectedEmail?.id === email.id} onOpenChange={(open) => {
                         setIsActionOpen(open);
                         if (open) {
                           setSelectedEmail(email);
                           setAdminComment(email.adminComment || '');
-                          setSelectedFromEmail(email.configId || '');
+                          setSelectedFromEmail(email.config?.email || email.fromEmail || '');
                         }
                       }}>
                         <DialogTrigger
@@ -721,31 +533,31 @@ export default function EmailMonitoringPage() {
                             </Button>
                           }
                         />
-                        <DialogContent className="sm:max-w-[700px] bg-white rounded-[24px] border-none shadow-2xl p-0 overflow-hidden">
-                          <DialogHeader className="px-8 py-6 bg-[#f8fafc] border-b border-[#e2e8f0]">
+                        <DialogContent className="w-[calc(100%-32px)] sm:max-w-[700px] max-h-[90vh] flex flex-col bg-white rounded-[24px] border-none shadow-2xl p-0 overflow-hidden">
+                          <DialogHeader className="px-8 py-6 bg-[#f8fafc] border-b border-[#e2e8f0] flex-shrink-0">
                             <DialogTitle className="text-xl font-bold text-[#1e293b]">Review Email Request</DialogTitle>
                           </DialogHeader>
-                           <div className="p-8 space-y-8 max-h-[80vh] overflow-y-auto">
+                           <div className="p-8 space-y-8 flex-1 overflow-y-auto">
                              <div className="p-6 bg-[#f8fafc] rounded-[24px] border border-[#e2e8f0] space-y-4 shadow-sm relative group">
-                              <div className="grid grid-cols-2 gap-6 mb-4">
-                                <div className="space-y-1">
+                              <div className="flex flex-col gap-4 mb-4">
+                                <div className="space-y-1 min-w-0">
                                   <p className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider">From (Suggested)</p>
-                                  <p className="text-sm font-bold text-[#1e293b]">{email.fromEmail || 'Default'}</p>
+                                  <p className="text-sm font-bold text-[#1e293b] break-words">{email.fromEmail || 'Default'}</p>
                                 </div>
-                                <div className="space-y-1">
+                                <div className="space-y-1 min-w-0">
                                   <p className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider">To (Recipient)</p>
-                                  <p className="text-sm font-bold text-indigo-600">{email.to}</p>
+                                  <p className="text-sm font-bold text-indigo-600 break-words">{email.to}</p>
                                 </div>
                                 {email.cc && (
-                                  <div className="space-y-1 col-span-2">
+                                  <div className="space-y-1 min-w-0">
                                     <p className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider">CC</p>
-                                    <p className="text-sm text-[#475569]">{email.cc}</p>
+                                    <p className="text-sm text-[#475569] break-words">{email.cc}</p>
                                   </div>
                                 )}
                                 {email.bcc && (
-                                  <div className="space-y-1 col-span-2">
+                                  <div className="space-y-1 min-w-0">
                                     <p className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider">BCC</p>
-                                    <p className="text-sm text-[#475569]">{email.bcc}</p>
+                                    <p className="text-sm text-[#475569] break-words">{email.bcc}</p>
                                   </div>
                                 )}
                                 {email.scheduledAt && (
@@ -814,7 +626,7 @@ export default function EmailMonitoringPage() {
                                   onClick={() => {
                                     setEditDraftData({ 
                                       subject: email.subject, 
-                                      body: email.body,
+                                      body: htmlToText(email.body),
                                       to: email.to || '',
                                       cc: email.cc || '',
                                       bcc: email.bcc || ''
@@ -827,9 +639,10 @@ export default function EmailMonitoringPage() {
                               </div>
                               <div className="pt-4 border-t border-slate-200">
                                 <p className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider mb-2">Message Body</p>
-                                <div className="text-sm text-[#334155] whitespace-pre-wrap leading-relaxed bg-white p-6 rounded-xl border border-slate-100 italic shadow-inner min-h-[100px]">
-                                  {email.body}
-                                </div>
+                                <div 
+                                  className="text-sm text-[#334155] whitespace-pre-wrap leading-relaxed bg-white p-6 rounded-xl border border-slate-100 italic shadow-inner min-h-[100px]"
+                                  dangerouslySetInnerHTML={{ __html: typeof window !== 'undefined' ? DOMPurify.sanitize(email.body) : email.body }}
+                                />
                               </div>
                             </div>
  
@@ -880,11 +693,13 @@ export default function EmailMonitoringPage() {
                                     <Label className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider">Final Sender Selection</Label>
                                     <Select onValueChange={(val) => setSelectedFromEmail(val || '')} value={selectedFromEmail}>
                                       <SelectTrigger className="w-full rounded-2xl border-[#e2e8f0] h-12 bg-[#f8fafc] text-[#64748b] font-medium shadow-none focus:ring-[#6366f1] px-4">
-                                        <SelectValue placeholder="Select sender email" />
+                                        <SelectValue placeholder="Select sender email">
+                                          {selectedFromEmail}
+                                        </SelectValue>
                                       </SelectTrigger>
                                       <SelectContent className="bg-white rounded-xl">
                                         {configs.map(config => (
-                                          <SelectItem key={config.id} value={config.id}>{config.email}</SelectItem>
+                                          <SelectItem key={config.id} value={config.email}>{config.email}</SelectItem>
                                         ))}
                                       </SelectContent>
                                     </Select>
@@ -931,7 +746,7 @@ export default function EmailMonitoringPage() {
                             {email.status !== 'PENDING' && (
                               <div className="p-5 bg-[#f8fafc] rounded-xl border border-[#e2e8f0]">
                                 <p className="text-xs font-bold text-[#64748b] uppercase tracking-wider mb-2">Admin Comment:</p>
-                                <p className="text-sm text-[#1e293b] italic">{email.adminComment || 'No comment provided.'}</p>
+                                <p className="text-sm text-[#1e293b] italic whitespace-pre-wrap">{email.adminComment || 'No comment provided.'}</p>
                               </div>
                             )}
                           </div>
@@ -943,16 +758,17 @@ export default function EmailMonitoringPage() {
               )}
             </TableBody>
           </Table>
+          </div>
         </Card>
       </div>
 
       <Dialog open={isEditDraftOpen} onOpenChange={setIsEditDraftOpen}>
-        <DialogContent className="sm:max-w-[600px] bg-white rounded-[32px] border-none shadow-2xl p-0 overflow-hidden">
-          <DialogHeader className="px-10 py-8 bg-[#f8fafc] border-b border-[#e2e8f0]">
+        <DialogContent className="sm:max-w-[600px] max-h-[90vh] flex flex-col bg-white rounded-[32px] border-none shadow-2xl p-0 overflow-hidden">
+          <DialogHeader className="px-10 py-8 bg-[#f8fafc] border-b border-[#e2e8f0] flex-shrink-0">
             <DialogTitle className="text-2xl font-bold text-[#1e293b]">Edit Email Draft</DialogTitle>
             <p className="text-sm text-[#64748b]">Modify the subject or body before approval.</p>
           </DialogHeader>
-          <form onSubmit={handleUpdateDraft} className="p-10 space-y-6">
+          <form onSubmit={handleUpdateDraft} className="flex-1 overflow-y-auto p-10 space-y-6">
             <div className="space-y-2">
               <Label className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider">Recipient (To)</Label>
               <Input 

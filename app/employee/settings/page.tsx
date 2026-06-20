@@ -136,8 +136,8 @@ export default function EmployeeSettingsPage() {
     <DashboardLayout>
       <div className="space-y-8 max-w-3xl mx-auto">
         <header>
-          <h1 className="text-3xl font-bold text-[#1e293b] tracking-tight">AI Settings</h1>
-          <p className="text-[#64748b] mt-1">
+          <h1 className="text-2xl md:text-3xl font-bold text-[#1e293b] tracking-tight">AI Settings</h1>
+          <p className="text-xs md:text-sm text-[#64748b] mt-1">
             Add your personal API keys to use your preferred AI provider for email generation.
           </p>
         </header>

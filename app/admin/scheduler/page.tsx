@@ -40,6 +40,7 @@ export default function AdminSchedulerPage() {
   const [isRescheduleOpen, setIsRescheduleOpen] = useState(false);
   const [newDate, setNewDate] = useState('');
   const [newTime, setNewTime] = useState('');
+  const [isApproving, setIsApproving] = useState(false);
   
   const { token } = useAuth();
 
@@ -135,19 +136,48 @@ export default function AdminSchedulerPage() {
       toast.error('Failed to reschedule email');
     }
   };
+  
+  const handleApprove = async (id: string) => {
+    setIsApproving(true);
+    try {
+      const res = await fetch('/api/admin/emails', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          id,
+          status: 'APPROVED'
+        })
+      });
+      if (res.ok) {
+        toast.success('Email approved successfully');
+        setSelectedEmail(null);
+        fetchScheduledEmails();
+      } else {
+        const err = await res.json();
+        toast.error(err.error || 'Failed to approve email');
+      }
+    } catch (err) {
+      toast.error('Failed to approve email');
+    } finally {
+      setIsApproving(false);
+    }
+  };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'PENDING': 
-        return <Badge variant="outline" className="bg-amber-50 text-amber-600 border-amber-200"><Clock className="w-3 h-3 mr-1 animate-pulse" /> Pending Approval</Badge>;
+        return <Badge variant="outline" className="bg-amber-50 text-amber-600 border-amber-200 text-[10px] px-1.5 py-0.5"><Clock className="hidden sm:inline w-3 h-3 mr-1 animate-pulse" /> Pending Approval</Badge>;
       case 'SCHEDULED': 
-        return <Badge variant="outline" className="bg-blue-50 text-blue-600 border-blue-200"><Calendar className="w-3 h-3 mr-1 animate-pulse" /> Scheduled</Badge>;
+        return <Badge variant="outline" className="bg-blue-50 text-blue-600 border-blue-200 text-[10px] px-1.5 py-0.5"><Calendar className="hidden sm:inline w-3 h-3 mr-1 animate-pulse" /> Scheduled</Badge>;
       case 'SENT': 
-        return <Badge variant="outline" className="bg-emerald-50 text-emerald-600 border-emerald-200"><CheckCircle className="w-3 h-3 mr-1" /> Sent</Badge>;
+        return <Badge variant="outline" className="bg-emerald-50 text-emerald-600 border-emerald-200 text-[10px] px-1.5 py-0.5"><CheckCircle className="hidden sm:inline w-3 h-3 mr-1" /> Sent</Badge>;
       case 'FAILED': 
-        return <Badge variant="outline" className="bg-rose-50 text-rose-600 border-rose-200"><XCircle className="w-3 h-3 mr-1" /> Failed</Badge>;
+        return <Badge variant="outline" className="bg-rose-50 text-rose-600 border-rose-200 text-[10px] px-1.5 py-0.5"><XCircle className="hidden sm:inline w-3 h-3 mr-1" /> Failed</Badge>;
       default: 
-        return <Badge variant="outline">{status}</Badge>;
+        return <Badge variant="outline" className="text-[10px] px-1.5 py-0.5">{status}</Badge>;
     }
   };
 
@@ -165,53 +195,79 @@ export default function AdminSchedulerPage() {
       <div className="space-y-10">
         <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="page-title">
-            <h1 className="text-3xl font-bold text-[#1e293b] tracking-tight">Email Scheduler</h1>
-            <p className="text-[#64748b] mt-1">Manage and track scheduled emails across the organization.</p>
+            <h1 className="text-2xl md:text-3xl font-bold text-[#1e293b] tracking-tight">Email Scheduler</h1>
+            <p className="text-xs md:text-sm text-[#64748b] mt-1">Manage and track scheduled emails across the organization.</p>
           </div>
-          <div className="header-actions flex gap-3">
-            <Button variant="outline" onClick={fetchScheduledEmails} className="bg-white border-[#e2e8f0] text-[#1e293b] rounded-lg px-5 h-10 font-semibold shadow-sm hover:bg-slate-50">
+          <div className="header-actions flex items-center gap-3">
+            <Button 
+              variant="outline" 
+              onClick={fetchScheduledEmails} 
+              className="hidden md:inline-flex bg-white border-[#e2e8f0] text-[#1e293b] rounded-lg px-5 h-10 font-semibold shadow-sm hover:bg-slate-50"
+            >
               Refresh
             </Button>
+            {/* Desktop Schedule Email Button */}
             <Button 
               onClick={() => setIsComposeOpen(true)}
-              className="bg-[#6366f1] hover:bg-[#4f46e5] text-white rounded-lg px-5 h-10 font-semibold shadow-sm shadow-indigo-100"
+              className="hidden md:inline-flex bg-[#6366f1] hover:bg-[#4f46e5] text-white rounded-lg px-5 h-10 font-semibold shadow-sm shadow-indigo-100"
             >
               <Send className="w-4 h-4 mr-2" />
               Schedule Email
             </Button>
+
+            {/* Mobile Floating Action Button with Label Below */}
+            <div className="md:hidden fixed bottom-24 right-4 z-40 flex flex-col items-center gap-1">
+              <Button 
+                onClick={() => setIsComposeOpen(true)}
+                className="w-12 h-12 rounded-full shadow-lg flex items-center justify-center bg-[#6366f1] hover:bg-[#4f46e5] active:scale-95 transition-all text-white p-0 border-none"
+              >
+                <Send className="w-5 h-5" />
+              </Button>
+              <span className="text-[9px] font-bold text-[#6366f1] bg-white/95 px-2 py-0.5 rounded-full shadow-sm border border-[#e2e8f0] tracking-wide whitespace-nowrap">
+                Schedule Mail
+              </span>
+            </div>
           </div>
         </header>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <Card className="border border-[#e2e8f0] shadow-sm bg-white rounded-2xl">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-xs font-bold text-[#64748b] uppercase tracking-wider">Active Schedules</CardTitle>
-              <Calendar className="w-5 h-5 text-indigo-500" />
+        <div className="grid grid-cols-3 gap-2 md:gap-6">
+          <Card className="border border-[#e2e8f0] shadow-sm bg-white rounded-2xl py-2.5 md:py-4 gap-1 md:gap-4">
+            <CardHeader className="flex flex-row items-center justify-between px-2.5 md:px-6 pb-0 md:pb-2">
+              <CardTitle className="text-[9px] md:text-xs font-bold text-[#64748b] uppercase tracking-wider line-clamp-2 min-h-[20px] md:min-h-0 flex items-center">
+                Active<span className="hidden md:inline">&nbsp;Schedules</span>
+              </CardTitle>
+              <Calendar className="hidden md:block w-5 h-5 text-indigo-500 shrink-0" />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-[#1e293b]">{totalActive}</div>
-              <p className="text-xs text-[#64748b] mt-1">Ready for automatic dispatch</p>
+            <CardContent className="px-2.5 md:px-6">
+              <div className="text-base md:text-2xl font-bold text-[#1e293b]">{totalActive}</div>
+              <p className="hidden md:block text-xs text-[#64748b] mt-1">Ready for automatic dispatch</p>
             </CardContent>
           </Card>
-          <Card className="border border-[#e2e8f0] shadow-sm bg-white rounded-2xl">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-xs font-bold text-[#64748b] uppercase tracking-wider">Next 24 Hours</CardTitle>
-              <Clock className="w-5 h-5 text-[#6366f1]" />
+
+          <Card className="border border-[#e2e8f0] shadow-sm bg-white rounded-2xl py-2.5 md:py-4 gap-1 md:gap-4">
+            <CardHeader className="flex flex-row items-center justify-between px-2.5 md:px-6 pb-0 md:pb-2">
+              <CardTitle className="text-[9px] md:text-xs font-bold text-[#64748b] uppercase tracking-wider line-clamp-2 min-h-[20px] md:min-h-0 flex items-center">
+                Next&nbsp;24h<span className="hidden md:inline">ours</span>
+              </CardTitle>
+              <Clock className="hidden md:block w-5 h-5 text-[#6366f1] shrink-0" />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-[#1e293b]">{next24Hrs}</div>
-              <p className="text-xs text-[#64748b] mt-1">Sending within 24 hours</p>
+            <CardContent className="px-2.5 md:px-6">
+              <div className="text-base md:text-2xl font-bold text-[#1e293b]">{next24Hrs}</div>
+              <p className="hidden md:block text-xs text-[#64748b] mt-1">Sending within 24 hours</p>
             </CardContent>
           </Card>
-          <Card className="border border-[#e2e8f0] shadow-sm bg-white rounded-2xl">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-xs font-bold text-[#64748b] uppercase tracking-wider">Pending Approval</CardTitle>
-              <AlertCircle className="w-5 h-5 text-amber-500" />
+
+          <Card className="border border-[#e2e8f0] shadow-sm bg-white rounded-2xl py-2.5 md:py-4 gap-1 md:gap-4">
+            <CardHeader className="flex flex-row items-center justify-between px-2.5 md:px-6 pb-0 md:pb-2">
+              <CardTitle className="text-[9px] md:text-xs font-bold text-[#64748b] uppercase tracking-wider line-clamp-2 min-h-[20px] md:min-h-0 flex items-center">
+                Pending<span className="hidden md:inline">&nbsp;Approval</span>
+              </CardTitle>
+              <AlertCircle className="hidden md:block w-5 h-5 text-amber-500 shrink-0" />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-[#1e293b]">{totalPending}</div>
-              <p className="text-xs text-[#64748b] mt-1">Awaiting administrator review</p>
+            <CardContent className="px-2.5 md:px-6">
+              <div className="text-base md:text-2xl font-bold text-[#1e293b]">{totalPending}</div>
+              <p className="hidden md:block text-xs text-[#64748b] mt-1">Awaiting administrator review</p>
             </CardContent>
           </Card>
         </div>
@@ -219,15 +275,15 @@ export default function AdminSchedulerPage() {
         {/* Desktop Scheduled List */}
         <Card className="border border-[#e2e8f0] shadow-[0_2px_8px_rgba(0,0,0,0.04)] bg-white rounded-[24px] overflow-hidden">
           <div className="overflow-x-auto">
-            <Table>
+            <Table className="min-w-[600px] md:min-w-full">
               <TableHeader>
                 <TableRow className="bg-[#fafafa] hover:bg-[#fafafa]">
-                  <TableHead className="px-8 py-4 text-[11px] font-bold text-[#64748b] uppercase tracking-wider">Sender</TableHead>
-                  <TableHead className="px-8 py-4 text-[11px] font-bold text-[#64748b] uppercase tracking-wider">Recipient</TableHead>
-                  <TableHead className="px-8 py-4 text-[11px] font-bold text-[#64748b] uppercase tracking-wider">Subject</TableHead>
-                  <TableHead className="px-8 py-4 text-[11px] font-bold text-[#64748b] uppercase tracking-wider">Scheduled Time</TableHead>
-                  <TableHead className="px-8 py-4 text-[11px] font-bold text-[#64748b] uppercase tracking-wider">Status</TableHead>
-                  <TableHead className="px-8 py-4 text-[11px] font-bold text-[#64748b] uppercase tracking-wider text-right">Actions</TableHead>
+                  <TableHead className="px-3 md:px-4 py-3 md:py-4 text-[10px] md:text-[11px] font-bold text-[#64748b] uppercase tracking-wider">Sender</TableHead>
+                  <TableHead className="px-3 md:px-4 py-3 md:py-4 text-[10px] md:text-[11px] font-bold text-[#64748b] uppercase tracking-wider">Recipient</TableHead>
+                  <TableHead className="px-3 md:px-4 py-3 md:py-4 text-[10px] md:text-[11px] font-bold text-[#64748b] uppercase tracking-wider">Subject</TableHead>
+                  <TableHead className="px-3 md:px-4 py-3 md:py-4 text-[10px] md:text-[11px] font-bold text-[#64748b] uppercase tracking-wider">Scheduled Time</TableHead>
+                  <TableHead className="px-3 md:px-4 py-3 md:py-4 text-[10px] md:text-[11px] font-bold text-[#64748b] uppercase tracking-wider">Status</TableHead>
+                  <TableHead className="px-3 md:px-4 py-3 md:py-4 text-[10px] md:text-[11px] font-bold text-[#64748b] uppercase tracking-wider text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -238,45 +294,58 @@ export default function AdminSchedulerPage() {
                 ) : (
                   emails.map((email) => (
                     <TableRow key={email.id} className="hover:bg-slate-50/50 border-b border-[#e2e8f0] transition-colors">
-                      <TableCell className="px-8 py-5">
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full bg-[#e2e8f0] flex items-center justify-center text-[#64748b] text-[10px] font-bold">
+                      <TableCell className="px-3 md:px-4 py-3 md:py-5">
+                        <div className="flex items-center gap-2 md:gap-3">
+                          <div className="hidden sm:flex w-8 h-8 rounded-full bg-[#e2e8f0] items-center justify-center text-[#64748b] text-[10px] font-bold shrink-0">
                             {email.employee ? email.employee.name[0] : 'A'}
                           </div>
-                          <div className="flex flex-col">
-                            <span className="text-sm font-semibold text-[#1e293b]">
+                          <div className="flex flex-col min-w-0 max-w-[120px] md:max-w-[150px]">
+                            <span className="text-xs md:text-sm font-semibold text-[#1e293b] leading-tight truncate">
                               {email.employee ? email.employee.name : 'Admin'}
                             </span>
-                            <span className="text-[10px] text-[#64748b]">
+                            <span className="text-[10px] text-[#64748b] truncate">
                               {email.employee ? email.employee.email : 'admin@system.com'}
                             </span>
                           </div>
                         </div>
                       </TableCell>
-                      <TableCell className="px-8 py-5 text-sm text-[#1e293b] font-semibold">{email.to}</TableCell>
-                      <TableCell className="px-8 py-5 max-w-xs truncate text-sm font-medium text-[#1e293b]">{email.subject}</TableCell>
-                      <TableCell className="px-8 py-5 text-sm text-[#475569] font-medium">
-                        {email.scheduledAt ? new Date(email.scheduledAt).toLocaleString() : 'Not Scheduled'}
+                      <TableCell className="px-3 md:px-4 py-3 md:py-5">
+                        <div className="flex flex-col gap-1 max-w-[120px] md:max-w-[180px]">
+                          {email.to.split(',').map((recipient, i) => (
+                            <div key={i} className="text-xs md:text-sm text-[#1e293b] font-semibold truncate break-all" title={recipient.trim()}>
+                              {recipient.trim()}
+                            </div>
+                          ))}
+                        </div>
                       </TableCell>
-                      <TableCell className="px-8 py-5">{getStatusBadge(email.status)}</TableCell>
-                      <TableCell className="px-8 py-5 text-right">
-                        <div className="flex justify-end space-x-1">
+                      <TableCell className="px-3 md:px-4 py-3 md:py-5 max-w-[120px] md:max-w-[180px] truncate text-xs md:text-sm font-medium text-[#1e293b]" title={email.subject}>{email.subject}</TableCell>
+                      <TableCell className="px-3 md:px-4 py-3 md:py-5">
+                        {email.scheduledAt ? (
+                          <div className="text-xs md:text-sm text-[#475569] font-medium leading-tight whitespace-nowrap">
+                            <div>{new Date(email.scheduledAt).toLocaleDateString([], { month: 'numeric', day: 'numeric', year: '2-digit' })}</div>
+                            <div className="text-[10px] md:text-[11px] text-slate-400 mt-0.5">{new Date(email.scheduledAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+                          </div>
+                        ) : 'Not Scheduled'}
+                      </TableCell>
+                      <TableCell className="px-3 md:px-4 py-3 md:py-5">{getStatusBadge(email.status)}</TableCell>
+                      <TableCell className="px-3 md:px-4 py-3 md:py-5 text-right">
+                        <div className="flex justify-end space-x-0.5 md:space-x-1">
                           <Dialog open={selectedEmail?.id === email.id && !isRescheduleOpen} onOpenChange={(open) => {
                             if (!open) setSelectedEmail(null);
                             else setSelectedEmail(email);
                           }}>
                             <DialogTrigger
                               render={
-                                <Button variant="ghost" size="icon" className="text-indigo-600 hover:bg-indigo-50 rounded-lg">
-                                  <Eye className="w-4 h-4" />
+                                <Button variant="ghost" size="icon" className="text-indigo-600 hover:bg-indigo-50 rounded-lg w-8 h-8 md:w-9 md:h-9">
+                                  <Eye className="w-3.5 h-3.5 md:w-4 md:h-4" />
                                 </Button>
                               }
                             />
-                            <DialogContent className="sm:max-w-[600px] bg-white rounded-[24px] border-none shadow-2xl p-0 overflow-hidden">
-                              <DialogHeader className="px-8 py-6 bg-[#f8fafc] border-b border-[#e2e8f0]">
+                            <DialogContent className="w-[calc(100%-32px)] sm:max-w-[600px] max-h-[90vh] flex flex-col bg-white rounded-[24px] border-none shadow-2xl p-0 overflow-hidden">
+                              <DialogHeader className="px-8 py-6 bg-[#f8fafc] border-b border-[#e2e8f0] flex-shrink-0">
                                 <DialogTitle className="text-xl font-bold text-[#1e293b]">Scheduled Email Details</DialogTitle>
                               </DialogHeader>
-                              <div className="p-8 space-y-6 max-h-[80vh] overflow-y-auto">
+                              <div className="p-8 space-y-6 flex-1 overflow-y-auto">
                                 <div className="grid grid-cols-2 gap-4">
                                   <div>
                                     <p className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider">Creator</p>
@@ -284,7 +353,13 @@ export default function AdminSchedulerPage() {
                                   </div>
                                   <div>
                                     <p className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider">Recipient</p>
-                                    <p className="text-sm font-semibold text-indigo-600">{email.to}</p>
+                                    <div className="flex flex-col gap-1 mt-1">
+                                      {email.to.split(',').map((recipient, i) => (
+                                        <p key={i} className="text-sm font-semibold text-indigo-600 break-all">
+                                          {recipient.trim()}
+                                        </p>
+                                      ))}
+                                    </div>
                                   </div>
                                 </div>
                                 <div className="grid grid-cols-2 gap-4">
@@ -308,6 +383,17 @@ export default function AdminSchedulerPage() {
                                   <div className="text-xs text-[#334155] whitespace-pre-wrap leading-relaxed italic" dangerouslySetInnerHTML={{ __html: typeof window !== 'undefined' ? DOMPurify.sanitize(email.body) : email.body }}></div>
                                 </div>
                               </div>
+                              {email.status === 'PENDING' && (
+                                <div className="px-8 py-4 bg-[#f8fafc] border-t border-[#e2e8f0] flex justify-end gap-3 flex-shrink-0">
+                                  <Button 
+                                    className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold px-4 h-9 shadow-sm"
+                                    onClick={() => handleApprove(email.id)}
+                                    disabled={isApproving}
+                                  >
+                                    {isApproving ? 'Approving...' : 'Approve Email'}
+                                  </Button>
+                                </div>
+                              )}
                             </DialogContent>
                           </Dialog>
 
@@ -316,7 +402,7 @@ export default function AdminSchedulerPage() {
                               <Button 
                                 variant="ghost" 
                                 size="icon" 
-                                className="text-indigo-600 hover:bg-indigo-50 rounded-lg"
+                                className="text-indigo-600 hover:bg-indigo-50 rounded-lg w-8 h-8 md:w-9 md:h-9"
                                 onClick={() => {
                                   setSelectedEmail(email);
                                   if (email.scheduledAt) {
@@ -328,16 +414,16 @@ export default function AdminSchedulerPage() {
                                 }}
                                 title="Reschedule"
                               >
-                                <Edit2 className="w-4 h-4" />
+                                <Edit2 className="w-3.5 h-3.5 md:w-4 md:h-4" />
                               </Button>
                               <Button 
                                 variant="ghost" 
                                 size="icon" 
-                                className="text-rose-600 hover:bg-rose-50 rounded-lg"
+                                className="text-rose-600 hover:bg-rose-50 rounded-lg w-8 h-8 md:w-9 md:h-9"
                                 onClick={() => handleCancel(email.id)}
                                 title="Cancel schedule"
                               >
-                                <Trash2 className="w-4 h-4" />
+                                <Trash2 className="w-3.5 h-3.5 md:w-4 md:h-4" />
                               </Button>
                             </>
                           )}

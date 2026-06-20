@@ -394,13 +394,13 @@ export default function EmployeesPage() {
       <div className="space-y-10">
         <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="page-title">
-            <h1 className="text-3xl font-bold text-[#1e293b] tracking-tight">Team Member Management</h1>
-            <p className="text-[#64748b] mt-1">Manage your team members and their access.</p>
+            <h1 className="text-2xl md:text-3xl font-bold text-[#1e293b] tracking-tight">Team Member Management</h1>
+            <p className="text-xs md:text-sm text-[#64748b] mt-1">Manage your team members and their access.</p>
           </div>
-          <div className="flex gap-2 flex-wrap">
+          <div className="flex gap-2 w-full md:w-auto">
             <Button 
               onClick={() => setIsDailyLogOpen(true)}
-              className="bg-white hover:bg-slate-50 text-[#1e293b] border border-[#e2e8f0] rounded-lg px-5 h-10 font-semibold shadow-sm"
+              className="hidden md:inline-flex bg-white hover:bg-slate-50 text-[#1e293b] border border-[#e2e8f0] rounded-lg px-5 h-10 font-semibold shadow-sm"
             >
               <Calendar className="w-4 h-4 mr-2 text-indigo-500" />
               Attendance Log
@@ -408,17 +408,17 @@ export default function EmployeesPage() {
 
             <Button 
               onClick={() => setIsGlobalProjectAssignOpen(true)}
-              className="bg-white hover:bg-slate-50 text-[#1e293b] border border-[#e2e8f0] rounded-lg px-5 h-10 font-semibold shadow-sm"
+              className="flex-1 md:flex-initial bg-white hover:bg-slate-50 text-[#1e293b] border border-[#e2e8f0] rounded-lg px-2 md:px-5 h-10 font-semibold shadow-sm text-xs md:text-sm flex items-center justify-center"
             >
-              <Briefcase className="w-4 h-4 mr-2 text-indigo-500" />
+              <Briefcase className="w-4 h-4 mr-1 md:mr-2 text-indigo-500 shrink-0" />
               Assign Project
             </Button>
 
             <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
               <DialogTrigger
                 render={
-                  <Button className="bg-[#6366f1] hover:bg-[#4f46e5] text-white rounded-lg px-5 h-10 font-semibold shadow-sm shadow-indigo-100">
-                    <UserPlus className="w-4 h-4 mr-2" />
+                  <Button className="flex-1 md:flex-initial bg-[#6366f1] hover:bg-[#4f46e5] text-white rounded-lg px-2 md:px-5 h-10 font-semibold shadow-sm shadow-indigo-100 text-xs md:text-sm flex items-center justify-center">
+                    <UserPlus className="w-4 h-4 mr-1 md:mr-2 shrink-0" />
                     Add Team Member
                   </Button>
                 }

@@ -235,15 +235,15 @@ export default function EmployeeDashboard() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-10">
+      <div className="space-y-6 md:space-y-10">
         <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="page-title">
-            <h1 className="text-3xl font-bold text-[#1e293b] tracking-tight">Welcome, {user?.name}!</h1>
-            <p className="text-[#64748b] mt-1">Track your email requests and generate new ones with AI.</p>
+            <h1 className="text-2xl md:text-3xl font-bold text-[#1e293b] tracking-tight">Welcome, {user?.name}!</h1>
+            <p className="text-xs md:text-sm text-[#64748b] mt-1">Track your email requests and generate new ones with AI.</p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
             {/* Clock Widget */}
-            <div className="flex items-center gap-3 bg-white border border-[#e2e8f0] px-4 py-1.5 rounded-xl shadow-sm h-10">
+            <div className="hidden md:flex items-center gap-3 bg-white border border-[#e2e8f0] px-4 py-1.5 rounded-xl shadow-sm h-10">
               <div className="flex items-center gap-2">
                 <span className={`w-2.5 h-2.5 rounded-full ${activeSession ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`}></span>
                 <span className="text-xs font-semibold text-[#1e293b]">
@@ -265,7 +265,7 @@ export default function EmployeeDashboard() {
             </div>
 
             <Button 
-              className="bg-[#6366f1] hover:bg-[#4f46e5] text-white rounded-lg px-5 h-10 font-semibold shadow-sm shadow-indigo-100"
+              className="hidden md:inline-flex bg-[#6366f1] hover:bg-[#4f46e5] text-white rounded-lg px-5 h-10 font-semibold shadow-sm shadow-indigo-100"
               onClick={() => setIsComposeOpen(true)}
             >
               <Send className="w-4 h-4 mr-2" />
@@ -274,13 +274,16 @@ export default function EmployeeDashboard() {
           </div>
         </header>
 
-        {/* Mobile Stats Row (Visible only on mobile) */}
-        <div className="flex md:hidden overflow-x-auto pb-4 gap-3 no-scrollbar scroll-smooth">
+        {/* Mobile Stats Row (Visible only on mobile, no horizontal scrollbar) */}
+        <div className="grid grid-cols-2 gap-2.5 md:hidden">
           {statCards.map((stat) => (
-            <div key={stat.title} className="flex-shrink-0 bg-white border border-[#e2e8f0] px-4 py-2 rounded-xl flex items-center gap-2 shadow-sm min-w-[120px]">
-              <div className={`w-2 h-2 rounded-full ${stat.color}`}></div>
-              <span className="text-[10px] font-bold text-[#64748b] whitespace-nowrap">{stat.title}:</span>
-              <span className="text-sm font-bold text-[#1e293b]">{loading ? '..' : stat.value}</span>
+            <div key={stat.title} className="bg-white border border-[#e2e8f0] p-3 rounded-2xl flex flex-col items-center justify-center text-center shadow-sm">
+              <span className="text-[9px] font-bold text-[#64748b] uppercase tracking-wider line-clamp-1">
+                {stat.title}
+              </span>
+              <span className="text-lg font-bold text-[#1e293b] mt-1">
+                {loading ? '..' : stat.value}
+              </span>
             </div>
           ))}
         </div>
@@ -307,7 +310,7 @@ export default function EmployeeDashboard() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <div className="lg:col-span-2">
+          <div className="lg:col-span-2 lg:row-span-2 order-2 lg:order-1">
             <Card className="border border-[#e2e8f0] shadow-[0_2px_8px_rgba(0,0,0,0.04)] bg-white rounded-[24px] overflow-hidden">
               <CardHeader className="px-6 md:px-8 py-5 md:py-6 border-b border-[#e2e8f0] flex flex-row items-center justify-between bg-white">
                 <CardTitle className="text-lg font-bold text-[#1e293b]">Recent Requests</CardTitle>
@@ -383,7 +386,7 @@ export default function EmployeeDashboard() {
             </Card>
           </div>
 
-          <div className="lg:col-span-1">
+          <div className="lg:col-span-1 order-1 lg:order-2">
             <Card className="border border-[#e2e8f0] shadow-[0_2px_8px_rgba(0,0,0,0.04)] bg-white rounded-[24px] overflow-hidden">
               <CardHeader className="px-6 py-5 border-b border-[#e2e8f0] flex flex-row items-center gap-2 bg-white">
                 <Briefcase className="w-5 h-5 text-[#6366f1]" />
@@ -465,8 +468,10 @@ export default function EmployeeDashboard() {
                 )}
               </CardContent>
             </Card>
+          </div>
 
-            <Card className="border border-[#e2e8f0] shadow-[0_2px_8px_rgba(0,0,0,0.04)] bg-white rounded-[24px] overflow-hidden mt-8">
+          <div className="lg:col-span-1 order-3 lg:order-3">
+            <Card className="border border-[#e2e8f0] shadow-[0_2px_8px_rgba(0,0,0,0.04)] bg-white rounded-[24px] overflow-hidden">
               <CardHeader className="px-6 py-5 border-b border-[#e2e8f0] flex flex-row items-center gap-2 bg-white">
                 <Clock className="w-5 h-5 text-[#6366f1]" />
                 <CardTitle className="text-lg font-bold text-[#1e293b]">Recent Attendance</CardTitle>
@@ -503,6 +508,37 @@ export default function EmployeeDashboard() {
         </div>
       </div>
       {isComposeOpen && <ComposeModal onClose={() => setIsComposeOpen(false)} />}
+
+      {/* Mobile Clock Widget (Floating bottom left) */}
+      <div className="md:hidden fixed bottom-[76px] left-4 z-40 flex items-center gap-2 bg-white border border-[#e2e8f0]/80 backdrop-blur-md px-3 py-1.5 rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.08)]">
+        <div className="flex items-center gap-1.5">
+          <span className={`w-2 h-2 rounded-full ${activeSession ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`}></span>
+          <span className="text-[10px] font-bold text-[#1e293b]">
+            {activeSession ? 'In' : 'Out'}
+          </span>
+        </div>
+        <Button
+          size="sm"
+          onClick={handleClockToggle}
+          className={cn(
+            "h-7 text-[10px] font-bold rounded-xl px-2.5 text-white transition-all shadow-sm active:scale-95",
+            activeSession 
+              ? "bg-rose-500 hover:bg-rose-600 shadow-rose-100" 
+              : "bg-emerald-500 hover:bg-emerald-600 shadow-emerald-100"
+          )}
+        >
+          {activeSession ? 'Clock Out' : 'Clock In'}
+        </Button>
+      </div>
+
+      {/* Mobile New Email Floating Button (Bottom Right) */}
+      <Button
+        onClick={() => setIsComposeOpen(true)}
+        className="md:hidden fixed bottom-[76px] right-4 z-40 bg-[#6366f1] hover:bg-[#4f46e5] text-white rounded-2xl h-10 px-4 font-bold shadow-[0_8px_20px_-4px_rgba(99,102,241,0.6)] flex items-center justify-center gap-1.5 active:scale-95 transition-all"
+      >
+        <Send className="w-4 h-4" />
+        New Email
+      </Button>
 
       {/* Camera Verification Modal */}
       <Dialog open={isCameraOpen} onOpenChange={(open) => { if (!open) closeCamera(); }}>

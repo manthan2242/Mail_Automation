@@ -39,7 +39,7 @@ export async function POST(request: Request) {
     const payload = await verifyToken(token);
     if (!payload) return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
 
-    const { to, cc, bcc, subject, body, fromEmail, configId, attachments, scheduledAt } = await request.json();
+    const { to, cc, bcc, subject, body, fromEmail, configId, attachments, scheduledAt, status } = await request.json();
 
     if (!subject || !body) {
       return NextResponse.json({ error: 'Subject and body are required' }, { status: 400 });
@@ -50,7 +50,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: attachmentError }, { status: 400 });
     }
 
-    // Save email as PENDING for admin approval
+    const targetStatus = status === 'DRAFT' ? 'DRAFT' : 'PENDING';
+
+    // Save email with target status
     const email = await prisma.email.create({
       data: {
         to: to || null,
@@ -61,21 +63,24 @@ export async function POST(request: Request) {
         body,
         senderId: payload.id,
         configId: configId || null,
-        status: 'PENDING',
+        status: targetStatus,
         scheduledAt: scheduledAt ? new Date(scheduledAt) : null,
         attachments: attachments ? JSON.stringify(attachments) : null,
       },
     });
 
-    // Send a copy to the employee for their records (asynchronously)
-    sendEmail(
-      payload.email,
-      `Draft Submitted: ${subject}`,
-      `Hi ${(payload as any).name || 'Employee'},\n\nYour request for "${subject}" has been submitted for review.`,
-      { noBcc: true }
-    ).catch((e: any) => {
-      console.warn('[NOTIFY ERROR]: Could not send submission copy to employee', e);
-    });
+    // Only send notification for non-draft submissions
+    if (targetStatus === 'PENDING') {
+      // Send a copy to the employee for their records (asynchronously)
+      sendEmail(
+        payload.email,
+        `Draft Submitted: ${subject}`,
+        `Hi ${(payload as any).name || 'Employee'},\n\nYour request for "${subject}" has been submitted for review.`,
+        { noBcc: true }
+      ).catch((e: any) => {
+        console.warn('[NOTIFY ERROR]: Could not send submission copy to employee', e);
+      });
+    }
 
     return NextResponse.json(email);
   } catch (error) {

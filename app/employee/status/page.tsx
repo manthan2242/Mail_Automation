@@ -264,12 +264,69 @@ export default function StatusTrackingPage() {
         <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="page-title">
             <h1 className="text-2xl md:text-3xl font-bold text-[#1e293b] tracking-tight">Status Tracking</h1>
-            <p className="text-[#64748b] mt-1 text-sm">Monitor the approval status of your sent emails.</p>
+            <p className="text-xs md:text-sm text-[#64748b] mt-1">Monitor the approval status of your sent emails.</p>
           </div>
         </header>
 
-        {/* Clickable Filter Tabs (works on both mobile and desktop) */}
-        <div className="flex overflow-x-auto gap-2 pb-1 no-scrollbar">
+        {/* Clickable Filter Tabs (Mobile only: paging snap layout) */}
+        <div className="md:hidden flex overflow-x-auto snap-x snap-mandatory scroll-smooth gap-0 w-full pb-2">
+          {/* Screen 1: first 4 filters */}
+          <div className="w-full shrink-0 grid grid-cols-4 gap-1 px-1 snap-start">
+            {filterTabs.slice(0, 4).map(tab => {
+              const Icon = tab.icon;
+              const isActive = activeFilter === tab.key;
+              return (
+                <button
+                  key={tab.key}
+                  onClick={() => setActiveFilter(tab.key)}
+                  className={`flex flex-col items-center justify-center gap-1 py-2 px-1 rounded-xl border text-[9px] font-bold transition-all active:scale-95 text-center ${
+                    isActive
+                      ? tab.activeClass
+                      : 'bg-white text-[#64748b] border-[#e2e8f0] hover:border-[#6366f1] hover:text-[#6366f1]'
+                  }`}
+                >
+                  <Icon className="w-3.5 h-3.5 shrink-0" />
+                  <span className="truncate max-w-[65px]">{tab.label}</span>
+                  <span className={`px-1.5 py-0.5 rounded-md text-[8px] font-bold shrink-0 ${
+                    isActive ? tab.countClass : 'bg-[#f1f5f9] text-[#64748b]'
+                  }`}>
+                    {counts[tab.key]}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Screen 2: next 4 filters */}
+          <div className="w-full shrink-0 grid grid-cols-4 gap-1 px-1 snap-start">
+            {filterTabs.slice(4).map(tab => {
+              const Icon = tab.icon;
+              const isActive = activeFilter === tab.key;
+              return (
+                <button
+                  key={tab.key}
+                  onClick={() => setActiveFilter(tab.key)}
+                  className={`flex flex-col items-center justify-center gap-1 py-2 px-1 rounded-xl border text-[9px] font-bold transition-all active:scale-95 text-center ${
+                    isActive
+                      ? tab.activeClass
+                      : 'bg-white text-[#64748b] border-[#e2e8f0] hover:border-[#6366f1] hover:text-[#6366f1]'
+                  }`}
+                >
+                  <Icon className="w-3.5 h-3.5 shrink-0" />
+                  <span className="truncate max-w-[65px]">{tab.label}</span>
+                  <span className={`px-1.5 py-0.5 rounded-md text-[8px] font-bold shrink-0 ${
+                    isActive ? tab.countClass : 'bg-[#f1f5f9] text-[#64748b]'
+                  }`}>
+                    {counts[tab.key]}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Clickable Filter Tabs (Desktop only: single line layout) */}
+        <div className="hidden md:flex overflow-x-auto gap-2 pb-1 no-scrollbar">
           {filterTabs.map(tab => {
             const Icon = tab.icon;
             const isActive = activeFilter === tab.key;
@@ -394,30 +451,30 @@ export default function StatusTrackingPage() {
                                 <span className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider">ID: {email.id.substring(0, 8)}</span>
                               </div>
                               <div className="p-4 md:p-5 bg-[#f8fafc] rounded-xl border border-[#e2e8f0] space-y-3">
-                                <div className="grid grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                   <div>
                                     <p className="text-xs font-bold text-[#64748b] uppercase tracking-wider">Sender</p>
-                                    <p className="text-sm font-semibold text-[#1e293b]">{email.employee?.name || 'Unknown'}</p>
-                                    <p className="text-[10px] text-[#64748b]">{email.employee?.email || ''}</p>
+                                    <p className="text-sm font-semibold text-[#1e293b] break-all">{email.employee?.name || 'Unknown'}</p>
+                                    <p className="text-[10px] text-[#64748b] break-all">{email.employee?.email || ''}</p>
                                   </div>
                                   <div>
                                     <p className="text-xs font-bold text-[#64748b] uppercase tracking-wider">Recipient (To)</p>
-                                    <p className="text-sm font-semibold text-indigo-600">{email.to || 'N/A'}</p>
+                                    <p className="text-sm font-semibold text-indigo-600 break-all">{email.to || 'N/A'}</p>
                                   </div>
                                   {email.cc && (
-                                    <div className="col-span-2">
+                                    <div className="sm:col-span-2">
                                       <p className="text-xs font-bold text-[#64748b] uppercase tracking-wider">CC</p>
-                                      <p className="text-xs text-[#475569]">{email.cc}</p>
+                                      <p className="text-xs text-[#475569] break-all">{email.cc}</p>
                                     </div>
                                   )}
                                   {email.bcc && (
-                                    <div className="col-span-2">
+                                    <div className="sm:col-span-2">
                                       <p className="text-xs font-bold text-[#64748b] uppercase tracking-wider">BCC</p>
-                                      <p className="text-xs text-[#475569]">{email.bcc}</p>
+                                      <p className="text-xs text-[#475569] break-all">{email.bcc}</p>
                                     </div>
                                   )}
                                   {email.scheduledAt && (
-                                    <div className="col-span-2">
+                                    <div className="sm:col-span-2">
                                       <p className="text-xs font-bold text-[#64748b] uppercase tracking-wider">Scheduled Send Time</p>
                                       <p className="text-sm font-semibold text-[#1e293b]">{new Date(email.scheduledAt).toLocaleString()}</p>
                                     </div>
@@ -426,7 +483,7 @@ export default function StatusTrackingPage() {
                                     const matchedProjects = getMatchedProjectsForEmail(email);
                                     if (matchedProjects.length > 0) {
                                       return (
-                                        <div className="col-span-2">
+                                        <div className="sm:col-span-2">
                                           <p className="text-xs font-bold text-[#64748b] uppercase tracking-wider">Project</p>
                                           <div className="flex flex-wrap gap-1.5 mt-1">
                                             {matchedProjects.map((mp, i) => (
@@ -449,7 +506,7 @@ export default function StatusTrackingPage() {
 
                                 <div className="pt-2 border-t border-[#e2e8f0]">
                                   <p className="text-xs font-bold text-[#64748b] uppercase tracking-wider mb-2">Body:</p>
-                                  <div className="text-sm text-[#1e293b] leading-relaxed prose prose-sm max-w-none bg-white p-4 rounded-xl border border-slate-100 italic" dangerouslySetInnerHTML={{ __html: typeof window !== 'undefined' ? DOMPurify.sanitize(email.body) : email.body }}></div>
+                                  <div className="text-sm text-[#1e293b] leading-relaxed prose prose-sm max-w-none bg-white p-4 rounded-xl border border-slate-100 italic whitespace-pre-wrap" dangerouslySetInnerHTML={{ __html: typeof window !== 'undefined' ? DOMPurify.sanitize(email.body) : email.body }}></div>
                                 </div>
 
                                 {email.attachments && (() => {
@@ -482,7 +539,7 @@ export default function StatusTrackingPage() {
                               {email.adminComment && (
                                 <div className="p-4 bg-[#eef2ff] border border-[#e0e7ff] rounded-xl">
                                   <p className="text-xs font-bold text-[#6366f1] uppercase tracking-wider mb-2">Admin Feedback:</p>
-                                  <p className="text-sm text-[#4338ca] italic leading-relaxed">{email.adminComment}</p>
+                                  <p className="text-sm text-[#4338ca] italic leading-relaxed whitespace-pre-wrap">{email.adminComment}</p>
                                 </div>
                               )}
                               <p className="text-[10px] text-[#94a3b8]">{new Date(email.createdAt).toLocaleString()}</p>

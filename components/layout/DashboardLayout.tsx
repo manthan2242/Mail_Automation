@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { 
@@ -52,6 +52,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const { user, logout } = useAuth();
   const pathname = usePathname();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  useEffect(() => {
+    const handleOpenMenu = () => setIsMobileMenuOpen(true);
+    window.addEventListener('open-mobile-menu', handleOpenMenu);
+    return () => window.removeEventListener('open-mobile-menu', handleOpenMenu);
+  }, []);
 
   const adminItems = [
     { href: '/admin/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
@@ -132,19 +138,27 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
       {/* Mobile Header */}
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="lg:hidden bg-white border-b border-[#e2e8f0] p-4 flex items-center justify-between sticky top-0 z-30">
+        <header className="lg:hidden bg-white border-b border-[#e2e8f0] p-4 flex items-center justify-between sticky top-0 z-30 shadow-sm">
           <div className="flex items-center gap-2 text-[#6366f1] font-extrabold text-lg">
-            <div className="w-6 h-6 bg-[#6366f1] rounded-md flex items-center justify-center">
-              <span className="text-white text-[10px]">M</span>
+            <div className="w-6.5 h-6.5 bg-[#6366f1] rounded-lg flex items-center justify-center shadow-sm">
+              <span className="text-white text-[11px]">M</span>
             </div>
             Mail Automation
           </div>
-          <Button variant="ghost" size="icon" onClick={() => setIsMobileMenuOpen(true)}>
-            <Menu className="w-6 h-6 text-[#64748b]" />
-          </Button>
+          
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-full bg-[#eef2ff] border border-indigo-100 flex items-center justify-center text-[#6366f1] text-xs font-bold shadow-inner">
+              {user?.name?.[0] || 'U'}
+            </div>
+            {pathname !== '/admin/dashboard' && (
+              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-lg" onClick={() => setIsMobileMenuOpen(true)}>
+                <Menu className="w-6 h-6 text-[#64748b]" />
+              </Button>
+            )}
+          </div>
         </header>
 
-        {/* Mobile Sidebar Overlay */}
+        {/* Mobile Sidebar Overlay (For "More" options on Admin, or full drawer) */}
         <AnimatePresence>
           {isMobileMenuOpen && (
             <>
@@ -174,7 +188,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   </Button>
                 </div>
 
-                <nav className="flex-1">
+                <nav className="flex-1 overflow-y-auto">
                   {items.map((item) => {
                     const active = pathname === item.href;
                     return (
@@ -194,6 +208,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 </nav>
 
                 <div className="px-6 pt-6 border-t border-[#e2e8f0]">
+                  <div className="flex items-center gap-3 mb-5">
+                    <div className="w-8 h-8 rounded-full bg-[#eef2ff] border border-indigo-100 flex items-center justify-center text-[#6366f1] text-xs font-bold shadow-inner">
+                      {user?.name?.[0] || 'U'}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-bold text-[#1e293b] truncate">{user?.name}</p>
+                      <p className="text-[10px] text-[#64748b] uppercase tracking-wider font-bold">
+                        {user?.role === 'employee' ? 'Team Member' : 'Admin'}
+                      </p>
+                    </div>
+                  </div>
                   <Button 
                     variant="ghost" 
                     className="w-full justify-start text-[#64748b] hover:text-red-600 hover:bg-red-50 rounded-lg h-9 px-2"
@@ -208,7 +233,42 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           )}
         </AnimatePresence>
 
-        <main className="flex-1 p-8 max-w-7xl mx-auto w-full overflow-y-auto">
+        {/* Mobile Bottom Navigation Bar */}
+        <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-[#e2e8f0] px-2 py-2 flex items-center justify-around z-30 shadow-[0_-4px_16px_rgba(0,0,0,0.04)] pb-[calc(10px+env(safe-area-inset-bottom))]">
+          {(user?.role === 'admin' 
+            ? [
+                { href: '/admin/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+                { href: '/admin/clients', icon: Briefcase, label: 'Clients' },
+                { href: '/admin/emails', icon: Mail, label: 'Monitoring' },
+                { href: '/admin/employees', icon: Users, label: 'Team' },
+                { href: '/admin/attendance', icon: ClipboardList, label: 'Attendance' },
+              ]
+            : [
+                { href: '/employee/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+                { href: '/employee/scheduler', icon: Clock, label: 'Scheduler' },
+                { href: '/employee/generate', icon: Send, label: 'Generate' },
+                { href: '/employee/status', icon: Activity, label: 'Status' },
+                { href: '/employee/settings', icon: Zap, label: 'Settings' },
+              ]
+          ).map((item) => {
+            const active = pathname === item.href;
+            return (
+              <Link key={item.href} href={item.href} className="flex-1">
+                <div className={cn(
+                  "flex flex-col items-center justify-center gap-1 py-1 rounded-xl transition-all duration-200",
+                  active 
+                    ? "text-[#6366f1]" 
+                    : "text-[#64748b] active:scale-95"
+                )}>
+                  <item.icon className={cn("w-5.5 h-5.5", active ? "text-[#6366f1]" : "text-[#64748b]")} />
+                  <span className="text-[10px] font-bold tracking-tight">{item.label}</span>
+                </div>
+              </Link>
+            );
+          })}
+        </nav>
+
+        <main className="flex-1 p-4 md:p-8 pb-24 md:pb-8 max-w-7xl mx-auto w-full overflow-y-auto">
           {children}
         </main>
       </div>

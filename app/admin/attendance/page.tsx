@@ -149,8 +149,8 @@ export default function AdminAttendancePage() {
       <div className="space-y-8 pb-10">
         <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="page-title">
-            <h1 className="text-3xl font-bold text-[#1e293b] tracking-tight">Attendance Log</h1>
-            <p className="text-[#64748b] mt-1">Monitor daily presence, sessions, and live verification photos date-wise.</p>
+            <h1 className="text-2xl md:text-3xl font-bold text-[#1e293b] tracking-tight">Attendance Log</h1>
+            <p className="text-xs md:text-sm text-[#64748b] mt-1">Monitor daily presence, sessions, and live verification photos date-wise.</p>
           </div>
           <div className="header-actions flex items-center gap-3">
             <div className="flex items-center gap-2 bg-white px-4 h-11 border border-[#e2e8f0] rounded-xl shadow-sm">
@@ -169,45 +169,56 @@ export default function AdminAttendancePage() {
         </header>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          <Card className="border border-[#e2e8f0] shadow-sm bg-white rounded-2xl">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-xs font-bold text-[#64748b] uppercase tracking-wider">Present Members</CardTitle>
-              <UserCheck className="w-5 h-5 text-emerald-500" />
+        <div className="grid grid-cols-4 gap-2 md:gap-6">
+          <Card className="border border-[#e2e8f0] shadow-sm bg-white rounded-2xl py-2.5 md:py-4 gap-1 md:gap-4">
+            <CardHeader className="flex flex-row items-center justify-between px-2.5 md:px-6 pb-0 md:pb-2">
+              <CardTitle className="text-[9px] md:text-xs font-bold text-[#64748b] uppercase tracking-wider line-clamp-2 min-h-[20px] md:min-h-0 flex items-center">
+                Present<span className="hidden md:inline">&nbsp;Members</span>
+              </CardTitle>
+              <UserCheck className="hidden md:block w-5 h-5 text-emerald-500 shrink-0" />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-[#1e293b]">{presentCount} <span className="text-sm font-normal text-slate-400">/ {totalEmployeesCount}</span></div>
-              <p className="text-xs text-[#64748b] mt-1">Logged presence for today</p>
+            <CardContent className="px-2.5 md:px-6">
+              <div className="text-base md:text-2xl font-bold text-[#1e293b]">{presentCount} <span className="text-[10px] md:text-sm font-normal text-slate-400">/ {totalEmployeesCount}</span></div>
+              <p className="hidden md:block text-xs text-[#64748b] mt-1">Logged presence for today</p>
             </CardContent>
           </Card>
-          <Card className="border border-[#e2e8f0] shadow-sm bg-white rounded-2xl">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-xs font-bold text-[#64748b] uppercase tracking-wider">Absent Members</CardTitle>
-              <AlertCircle className="w-5 h-5 text-rose-500" />
+
+          <Card className="border border-[#e2e8f0] shadow-sm bg-white rounded-2xl py-2.5 md:py-4 gap-1 md:gap-4">
+            <CardHeader className="flex flex-row items-center justify-between px-2.5 md:px-6 pb-0 md:pb-2">
+              <CardTitle className="text-[9px] md:text-xs font-bold text-[#64748b] uppercase tracking-wider line-clamp-2 min-h-[20px] md:min-h-0 flex items-center">
+                Absent<span className="hidden md:inline">&nbsp;Members</span>
+              </CardTitle>
+              <AlertCircle className="hidden md:block w-5 h-5 text-rose-500 shrink-0" />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-[#1e293b]">{absentCount}</div>
-              <p className="text-xs text-[#64748b] mt-1">No attendance logs found</p>
+            <CardContent className="px-2.5 md:px-6">
+              <div className="text-base md:text-2xl font-bold text-[#1e293b]">{absentCount}</div>
+              <p className="hidden md:block text-xs text-[#64748b] mt-1">No attendance logs found</p>
             </CardContent>
           </Card>
-          <Card className="border border-[#e2e8f0] shadow-sm bg-white rounded-2xl">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-xs font-bold text-[#64748b] uppercase tracking-wider">Active Clock-In</CardTitle>
-              <Clock className="w-5 h-5 text-indigo-500" />
+
+          <Card className="border border-[#e2e8f0] shadow-sm bg-white rounded-2xl py-2.5 md:py-4 gap-1 md:gap-4">
+            <CardHeader className="flex flex-row items-center justify-between px-2.5 md:px-6 pb-0 md:pb-2">
+              <CardTitle className="text-[9px] md:text-xs font-bold text-[#64748b] uppercase tracking-wider line-clamp-2 min-h-[20px] md:min-h-0 flex items-center">
+                Active<span className="hidden md:inline">&nbsp;Clock-In</span>
+              </CardTitle>
+              <Clock className="hidden md:block w-5 h-5 text-indigo-500 shrink-0" />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-indigo-600 animate-pulse">{activeSessionsCount}</div>
-              <p className="text-xs text-[#64748b] mt-1">Employees currently clocked in</p>
+            <CardContent className="px-2.5 md:px-6">
+              <div className="text-base md:text-2xl font-bold text-indigo-600 animate-pulse">{activeSessionsCount}</div>
+              <p className="hidden md:block text-xs text-[#64748b] mt-1">Employees currently clocked in</p>
             </CardContent>
           </Card>
-          <Card className="border border-[#e2e8f0] shadow-sm bg-white rounded-2xl">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-xs font-bold text-[#64748b] uppercase tracking-wider">Avg Working Hours</CardTitle>
-              <Users className="w-5 h-5 text-[#6366f1]" />
+
+          <Card className="border border-[#e2e8f0] shadow-sm bg-white rounded-2xl py-2.5 md:py-4 gap-1 md:gap-4">
+            <CardHeader className="flex flex-row items-center justify-between px-2.5 md:px-6 pb-0 md:pb-2">
+              <CardTitle className="text-[9px] md:text-xs font-bold text-[#64748b] uppercase tracking-wider line-clamp-2 min-h-[20px] md:min-h-0 flex items-center">
+                Avg<span className="hidden md:inline">&nbsp;Working</span>&nbsp;Hours
+              </CardTitle>
+              <Users className="hidden md:block w-5 h-5 text-[#6366f1] shrink-0" />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-[#1e293b]">{averageWorkingHours}</div>
-              <p className="text-xs text-[#64748b] mt-1">Average daily accumulated hours</p>
+            <CardContent className="px-2.5 md:px-6">
+              <div className="text-base md:text-2xl font-bold text-[#1e293b]">{averageWorkingHours}</div>
+              <p className="hidden md:block text-xs text-[#64748b] mt-1">Average daily accumulated hours</p>
             </CardContent>
           </Card>
         </div>
@@ -215,13 +226,13 @@ export default function AdminAttendancePage() {
         {/* Detailed Logs List */}
         <Card className="border border-[#e2e8f0] shadow-[0_2px_8px_rgba(0,0,0,0.04)] bg-white rounded-[24px] overflow-hidden">
           <div className="overflow-x-auto">
-            <Table>
+            <Table className="w-full">
               <TableHeader>
                 <TableRow className="bg-[#fafafa] hover:bg-[#fafafa]">
-                  <TableHead className="px-8 py-4 text-[11px] font-bold text-[#64748b] uppercase tracking-wider w-[240px]">Team Member</TableHead>
-                  <TableHead className="px-6 py-4 text-[11px] font-bold text-[#64748b] uppercase tracking-wider w-[120px]">Status</TableHead>
-                  <TableHead className="px-6 py-4 text-[11px] font-bold text-[#64748b] uppercase tracking-wider">Clock-In & Clock-Out Sessions</TableHead>
-                  <TableHead className="px-8 py-4 text-[11px] font-bold text-[#64748b] uppercase tracking-wider text-right w-[180px]">Total Hours</TableHead>
+                  <TableHead className="px-2 md:px-8 py-3 md:py-4 text-[9px] md:text-[11px] font-bold text-[#64748b] uppercase tracking-wider min-w-[120px] md:w-[240px]">Team Member</TableHead>
+                  <TableHead className="px-1.5 md:px-6 py-3 md:py-4 text-[9px] md:text-[11px] font-bold text-[#64748b] uppercase tracking-wider min-w-[80px] md:w-[120px]">Status</TableHead>
+                  <TableHead className="px-1.5 md:px-6 py-3 md:py-4 text-[9px] md:text-[11px] font-bold text-[#64748b] uppercase tracking-wider min-w-[240px] md:w-auto">Sessions</TableHead>
+                  <TableHead className="px-2 md:px-8 py-3 md:py-4 text-[9px] md:text-[11px] font-bold text-[#64748b] uppercase tracking-wider text-right min-w-[85px] md:w-[180px]">Total Hours</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -236,84 +247,84 @@ export default function AdminAttendancePage() {
 
                     return (
                       <TableRow key={employee.id} className="hover:bg-slate-50/50 border-b border-[#e2e8f0] transition-colors align-top">
-                        <TableCell className="px-8 py-5">
-                          <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-full bg-[#eef2ff] text-[#6366f1] flex items-center justify-center text-xs font-bold">
+                        <TableCell className="px-2 md:px-8 py-3 md:py-5">
+                          <div className="flex items-center gap-2 md:gap-3">
+                            <div className="hidden sm:flex w-8 h-8 rounded-full bg-[#eef2ff] text-[#6366f1] items-center justify-center text-xs font-bold shrink-0">
                               {employee.name[0].toUpperCase()}
                             </div>
                             <div className="flex flex-col min-w-0">
-                              <span className="text-sm font-semibold text-[#1e293b] truncate">
+                              <span className="text-[10px] md:text-sm font-semibold text-[#1e293b] leading-tight break-all md:break-normal">
                                 {employee.name}
                               </span>
-                              <span className="text-[10px] text-[#64748b] truncate">
+                              <span className="text-[8px] md:text-[10px] text-[#64748b] break-all md:break-normal">
                                 @{employee.username}
                               </span>
                             </div>
                           </div>
                         </TableCell>
-                        <TableCell className="px-6 py-5">
+                        <TableCell className="px-1.5 md:px-6 py-3 md:py-5">
                           {isClockedIn ? (
-                            <Badge className="bg-indigo-50 text-indigo-700 border-indigo-200 font-bold uppercase tracking-wider text-[9px] hover:bg-indigo-50 animate-pulse">
+                            <Badge className="bg-indigo-50 text-indigo-700 border-indigo-200 font-bold uppercase tracking-wider text-[8px] md:text-[9px] hover:bg-indigo-50 animate-pulse px-1 py-0.5">
                               Clocked In
                             </Badge>
                           ) : isPresent ? (
-                            <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 font-bold uppercase tracking-wider text-[9px] hover:bg-emerald-50">
+                            <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 font-bold uppercase tracking-wider text-[8px] md:text-[9px] hover:bg-emerald-50 px-1 py-0.5">
                               Present
                             </Badge>
                           ) : (
-                            <Badge className="bg-slate-50 text-slate-400 border-slate-200 font-bold uppercase tracking-wider text-[9px] hover:bg-slate-50">
+                            <Badge className="bg-slate-50 text-slate-400 border-slate-200 font-bold uppercase tracking-wider text-[8px] md:text-[9px] hover:bg-slate-50 px-1 py-0.5">
                               Absent
                             </Badge>
                           )}
                         </TableCell>
-                        <TableCell className="px-6 py-5">
+                        <TableCell className="px-1.5 md:px-6 py-3 md:py-5">
                           {isPresent ? (
-                            <div className="space-y-3.5">
+                            <div className="space-y-2">
                               {employee.attendanceLogs.map((log, index) => {
                                 const inTime = new Date(log.clockIn).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
                                 const outTime = log.clockOut ? new Date(log.clockOut).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : null;
 
                                 return (
-                                  <div key={log.id} className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-[#334155] bg-slate-50/80 hover:bg-slate-50 px-3.5 py-2.5 rounded-xl border border-slate-100/80 transition-colors">
-                                    <div className="font-semibold text-slate-500">Session {index + 1}:</div>
-                                    <div className="flex items-center gap-1.5">
+                                  <div key={log.id} className="flex flex-col md:flex-row md:items-center gap-1 md:gap-x-4 md:gap-y-1.5 text-[9px] md:text-xs text-[#334155] bg-slate-50/80 hover:bg-slate-50 p-1.5 md:px-3.5 md:py-2.5 rounded-xl border border-slate-100/80 transition-colors">
+                                    <div className="font-semibold text-slate-500 shrink-0">Session {index + 1}:</div>
+                                    <div className="flex items-center gap-1 shrink-0">
                                       <span className="font-medium text-slate-800">In: {inTime}</span>
                                       {log.clockInImage && (
                                         <button
                                           onClick={() => setPreviewImage({ src: log.clockInImage!, title: `${employee.name} - Clock In (Session ${index + 1})` })}
-                                          className="p-1 hover:bg-indigo-50 hover:text-indigo-600 rounded border border-slate-200 bg-white transition-colors"
+                                          className="p-0.5 hover:bg-indigo-50 hover:text-indigo-600 rounded border border-slate-200 bg-white transition-colors"
                                           title="View clock-in photo"
                                         >
-                                          <Camera className="w-3.5 h-3.5" />
+                                          <Camera className="w-3 h-3" />
                                         </button>
                                       )}
                                     </div>
-                                    <div className="flex items-center gap-1.5">
+                                    <div className="flex items-center gap-1 shrink-0">
                                       <span className="font-medium text-slate-800">
                                         Out: {outTime ? outTime : <span className="text-indigo-600 font-bold animate-pulse">Active</span>}
                                       </span>
                                       {log.clockOutImage && (
                                         <button
                                           onClick={() => setPreviewImage({ src: log.clockOutImage!, title: `${employee.name} - Clock Out (Session ${index + 1})` })}
-                                          className="p-1 hover:bg-indigo-50 hover:text-indigo-600 rounded border border-slate-200 bg-white transition-colors"
+                                          className="p-0.5 hover:bg-indigo-50 hover:text-indigo-600 rounded border border-slate-200 bg-white transition-colors"
                                           title="View clock-out photo"
                                         >
-                                          <Camera className="w-3.5 h-3.5" />
+                                          <Camera className="w-3 h-3" />
                                         </button>
                                       )}
                                     </div>
-                                    <div className="text-[10px] text-slate-400 font-medium ml-auto">
-                                      Duration: <span className="font-semibold text-slate-700">{formatWorkingHours(log.clockIn, log.clockOut)}</span>
+                                    <div className="text-[8px] md:text-[10px] text-slate-400 font-medium md:ml-auto shrink-0">
+                                      <span className="md:hidden">Dur: </span><span className="hidden md:inline">Duration: </span><span className="font-semibold text-slate-700">{formatWorkingHours(log.clockIn, log.clockOut)}</span>
                                     </div>
                                   </div>
                                 );
                               })}
                             </div>
                           ) : (
-                            <div className="text-xs text-slate-400 italic">No activity logged for this date.</div>
+                            <div className="text-[9px] md:text-xs text-slate-400 italic">No activity logged for this date.</div>
                           )}
                         </TableCell>
-                        <TableCell className="px-8 py-5 text-right font-bold text-[#1e293b] text-sm">
+                        <TableCell className="px-2 md:px-8 py-3 md:py-5 text-right font-bold text-[#1e293b] text-xs md:text-sm">
                           {isPresent ? calculateTotalWorkingHours(employee.attendanceLogs) : '-'}
                         </TableCell>
                       </TableRow>

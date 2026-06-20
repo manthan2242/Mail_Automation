@@ -420,7 +420,9 @@ export default function ComposeModal({
           <div className="flex-1 min-w-0">
             <Select value={selectedIdentity} onValueChange={(val) => setSelectedIdentity(val || 'default')}>
               <SelectTrigger className="w-full max-w-[320px] sm:max-w-[400px] min-w-[260px] border-none shadow-none h-8 bg-transparent text-gray-800 font-normal px-2 hover:bg-gray-50 rounded transition-colors text-sm flex justify-between items-center">
-                <SelectValue placeholder="Select Sender" />
+                <SelectValue placeholder="Select Sender">
+                  {selectedIdentity === 'default' ? 'Default Sender' : selectedIdentity}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent className="bg-white rounded-xl shadow-lg border border-gray-100 z-[200]">
                 {identities.map(id => (
@@ -569,8 +571,8 @@ export default function ComposeModal({
           </div>
         )}
 
-        <div className="flex-1 flex flex-col min-h-0">
-          <div ref={editorRef} className="flex-1 px-4 py-3 outline-none text-sm sm:text-base text-gray-800 leading-relaxed overflow-y-auto" contentEditable onInput={(e) => setBodyHtml(e.currentTarget.innerHTML)} />
+        <div className="flex-1 flex flex-col">
+          <div ref={editorRef} className="flex-1 min-h-[250px] px-4 py-3 outline-none text-sm sm:text-base text-gray-800 leading-relaxed" contentEditable onInput={(e) => setBodyHtml(e.currentTarget.innerHTML)} />
           
           <div className="px-4 pb-2">
             {attachments.length > 0 && (
@@ -586,6 +588,18 @@ export default function ComposeModal({
           </div>
         </div>
         
+        {/* Mobile AI Draft Button (Placed above the banner/reset block) */}
+        <div className="md:hidden mx-4 mb-3 flex justify-end shrink-0">
+          <Button 
+            className="bg-indigo-50 hover:bg-indigo-100 text-indigo-600 h-8 px-3 text-[10px] font-bold rounded-full shadow-none" 
+            onClick={handleGenerate} 
+            disabled={generating || !subject}
+          >
+            <Sparkles className="w-3 h-3 mr-1" />
+            AI Draft
+          </Button>
+        </div>
+
         {/* Banner only shown if forceSchedule is enabled and scheduledAt is valid */}
         {forceSchedule && scheduledAt && (
           <div className="mx-4 mb-3 p-3 bg-indigo-50 border border-indigo-100 rounded-xl flex items-center justify-between text-xs text-indigo-700 font-medium">
@@ -627,7 +641,7 @@ export default function ComposeModal({
           </div>
           
           <div className="flex items-center gap-1 sm:gap-2">
-            <Button className="bg-indigo-50 hover:bg-indigo-100 text-indigo-600 h-9 px-2 sm:px-3 text-[10px] sm:text-xs font-bold rounded-full shadow-none" onClick={handleGenerate} disabled={generating || !subject}>
+            <Button className="hidden md:inline-flex bg-indigo-50 hover:bg-indigo-100 text-indigo-600 h-9 px-2 sm:px-3 text-[10px] sm:text-xs font-bold rounded-full shadow-none" onClick={handleGenerate} disabled={generating || !subject}>
               <Sparkles className="w-3 h-3 sm:w-3.5 sm:h-3.5 mr-1" />
               AI Draft
             </Button>

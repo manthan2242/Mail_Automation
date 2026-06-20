@@ -321,7 +321,7 @@ export default function AdminMailTool() {
           subject: mailData.subject,
           body: mailData.body,
           status,
-          configId: selectedConfigId === 'default' ? undefined : selectedConfigId 
+          configId: selectedConfigId === 'default' ? undefined : configs.find(c => c.email === selectedConfigId)?.id 
         })
       });
       
@@ -366,8 +366,8 @@ export default function AdminMailTool() {
       <div className="space-y-8 pb-10">
         <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="page-title">
-            <h1 className="text-3xl font-bold text-[#1e293b] tracking-tight">Mail Writing Tool</h1>
-            <p className="text-[#64748b] mt-1">Compose professional emails manually or with AI assistance.</p>
+            <h1 className="text-2xl md:text-3xl font-bold text-[#1e293b] tracking-tight">Mail Writing Tool</h1>
+            <p className="text-xs md:text-sm text-[#64748b] mt-1">Compose professional emails manually or with AI assistance.</p>
           </div>
         </header>
 
@@ -388,11 +388,13 @@ export default function AdminMailTool() {
                     <Label className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider ml-1">Send From</Label>
                     <Select value={selectedConfigId} onValueChange={(val) => setSelectedConfigId(val || '')}>
                       <SelectTrigger className="rounded-xl border-[#e2e8f0] h-12 focus:ring-indigo-500/20">
-                        <SelectValue placeholder="Select Sender" />
+                        <SelectValue placeholder="Select Sender">
+                          {selectedConfigId}
+                        </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
                         {configs.map(config => (
-                          <SelectItem key={config.id} value={config.id}>{config.email}</SelectItem>
+                          <SelectItem key={config.id} value={config.email}>{config.email}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
