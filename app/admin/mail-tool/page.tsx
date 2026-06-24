@@ -22,7 +22,8 @@ import {
   Search as SearchIcon,
   RefreshCw,
   FileText,
-  X
+  X,
+  Reply
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { toast } from 'sonner';
@@ -359,6 +360,26 @@ export default function AdminMailTool() {
       body: item.body
     });
     toast.info('Template loaded in composer');
+  };
+
+  const handleReply = (item: MailHistoryItem) => {
+    let replySubject = item.subject || '';
+    if (replySubject && !/^(re|Re):\s*/i.test(replySubject)) {
+      replySubject = `Re: ${replySubject}`;
+    }
+
+    setToEmails(parseEmails(item.to));
+    setCcEmails(item.cc ? parseEmails(item.cc) : []);
+    setBccEmails(item.bcc ? parseEmails(item.bcc) : []);
+    setMailData({
+      to: '',
+      cc: '',
+      bcc: '',
+      subject: replySubject,
+      body: '' // Keep email body clean/empty as requested
+    });
+    setSelectedMail(null);
+    toast.info('Reply drafted in composer');
   };
 
   return (
@@ -731,18 +752,26 @@ export default function AdminMailTool() {
                 {selectedMail?.body}
             </div>
             
-            <div className="pt-2 flex gap-3">
+            <div className="pt-2 flex flex-col sm:flex-row gap-3">
+              <Button 
+                onClick={() => selectedMail && handleReply(selectedMail)}
+                className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl h-12 font-bold gap-2 shadow-md shadow-indigo-100"
+              >
+                <Reply className="w-4 h-4" />
+                Reply
+              </Button>
               <Button 
                 onClick={() => selectedMail && reuseTemplate(selectedMail)}
-                className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl h-12 font-bold gap-2"
+                variant="outline"
+                className="flex-1 rounded-xl h-12 border-slate-200 hover:bg-slate-50 font-bold gap-2 text-slate-700"
               >
-                <RefreshCw className="w-4 h-4" />
+                <RefreshCw className="w-4 h-4 text-slate-400" />
                 Reuse Template
               </Button>
               <Button 
-                variant="outline" 
+                variant="ghost" 
                 onClick={() => setSelectedMail(null)}
-                className="flex-1 rounded-xl h-12 border-slate-200 hover:bg-slate-50 font-bold"
+                className="flex-1 sm:flex-initial rounded-xl h-12 text-slate-500 hover:text-slate-800 font-bold"
               >
                 Close View
               </Button>

@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
-import { Sparkles, Send, RefreshCw, Eye, EyeOff, Zap, ExternalLink, X, Save, History, ChevronRight, Search } from 'lucide-react';
+import { Sparkles, Send, RefreshCw, Eye, EyeOff, Zap, ExternalLink, X, Save, History, ChevronRight, Search, Reply } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'next/navigation';
@@ -220,6 +220,36 @@ export default function GenerateEmailPage() {
 
     setSelectedMail(null);
     toast.info('Draft/Template loaded in generator');
+  };
+
+  const handleReply = (item: any) => {
+    let replySubject = item.subject || '';
+    if (replySubject && !/^(re|Re):\s*/i.test(replySubject)) {
+      replySubject = `Re: ${replySubject}`;
+    }
+    setSubject(replySubject);
+
+    // Keep email body clean/empty as requested
+    setBody('');
+
+    if (item.fromEmail) {
+      setSourceEmail(item.fromEmail);
+    }
+    
+    // Parse recipients, cc, bcc
+    const toList = item.to ? item.to.split(',').map((e: string) => e.trim()).filter(Boolean) : [];
+    const ccList = item.cc ? item.cc.split(',').map((e: string) => e.trim()).filter(Boolean) : [];
+    const bccList = item.bcc ? item.bcc.split(',').map((e: string) => e.trim()).filter(Boolean) : [];
+    
+    setRecipients(toList);
+    setCc(ccList);
+    setBcc(bccList);
+    
+    if (ccList.length > 0) setShowCc(true);
+    if (bccList.length > 0) setShowBcc(true);
+
+    setSelectedMail(null);
+    toast.info('Reply drafted with original recipients');
   };
 
   const getFilteredHistory = () => {
@@ -885,18 +915,26 @@ export default function GenerateEmailPage() {
               </div>
             )}
             
-            <div className="pt-2 flex gap-3">
+            <div className="pt-2 flex flex-col sm:flex-row gap-3">
+              <Button 
+                onClick={() => selectedMail && handleReply(selectedMail)}
+                className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl h-12 font-bold gap-2 shadow-md shadow-indigo-100"
+              >
+                <Reply className="w-4 h-4" />
+                Reply
+              </Button>
               <Button 
                 onClick={() => selectedMail && reuseTemplate(selectedMail)}
-                className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl h-12 font-bold gap-2"
+                variant="outline"
+                className="flex-1 rounded-xl h-12 border-slate-200 hover:bg-slate-50 font-bold gap-2 text-slate-700"
               >
-                <RefreshCw className="w-4 h-4" />
+                <RefreshCw className="w-4 h-4 text-slate-400" />
                 Reuse Template
               </Button>
               <Button 
-                variant="outline" 
+                variant="ghost" 
                 onClick={() => setSelectedMail(null)}
-                className="flex-1 rounded-xl h-12 border-slate-200 hover:bg-slate-50 font-bold"
+                className="flex-1 sm:flex-initial rounded-xl h-12 text-slate-500 hover:text-slate-800 font-bold"
               >
                 Close View
               </Button>
