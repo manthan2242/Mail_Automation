@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Input } from './input';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 
 interface EmailAutocompleteProps extends React.InputHTMLAttributes<HTMLInputElement> {
   onValueChange?: (value: string) => void;
@@ -80,11 +81,21 @@ export const EmailAutocomplete: React.FC<EmailAutocompleteProps> = ({
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
+    let value = e.target.value;
+    if (value.includes(',')) {
+      toast.error('Comma (,) is not accepted in recipient fields');
+      value = value.replace(/,/g, '');
+    }
     setInputValue(value);
     validateEmail(value);
     onValueChange?.(value);
-    onChange?.(e);
+    // Create a modified event with the cleaned value to pass up
+    const newEvent = {
+      ...e,
+      target: { ...e.target, value },
+      currentTarget: { ...e.currentTarget, value }
+    } as React.ChangeEvent<HTMLInputElement>;
+    onChange?.(newEvent);
     getSuggestions(value);
     setIsOpen(true);
     setSelectedIndex(-1);

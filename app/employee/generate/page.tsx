@@ -118,6 +118,10 @@ export default function GenerateEmailPage() {
   };
 
   const handleInputChange = (field: 'to' | 'cc' | 'bcc', val: string) => {
+    if (val.includes(',')) {
+      toast.error('Comma (,) is not accepted in recipient fields');
+      val = val.replace(/,/g, '');
+    }
     if (field === 'to') setToInput(val);
     if (field === 'cc') setCcInput(val);
     if (field === 'bcc') setBccInput(val);
