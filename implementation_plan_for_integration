@@ -1,0 +1,106 @@
+# Implementation Plan - SPMS SSO Integration
+
+This plan outlines the design and implementation for integrating SPMS SSO (Single Sign-On) with the Mail Automation system. Mail Automation will remain a standalone system, but it will trust SPMS as an identity provider (IdP). Users logged into SPMS can access Mail Automation without logging in again, and SPMS can synchronize user accounts with Mail Automation.
+
+---
+
+## User Review Required
+
+> [!IMPORTANT]
+> The database changes will add new fields (`authProvider`, `externalProvider`, and `lastSSOLogin`) to `User`, `Admin`, and `Employee` models. A database migration will be run to apply these changes to PostgreSQL.
+
+> [!NOTE]
+> Since `Admin` and `Employee` models require a password in the database, auto-created SSO users will be initialized with a secure, random bcrypt-hashed password so they cannot be logged in locally without resetting their password.
+
+---
+
+## Open Questions
+
+None. The requirements are fully specified.
+
+---
+
+## Proposed Changes
+
+### Database Changes
+#### [MODIFY] [schema.prisma](file:///c:/Projects/Mail-automation/prisma/schema.prisma)
+- Add the following fields to the `User`, `Admin`, and `Employee` models:
+  - `authProvider` String with default `"LOCAL"`
+  - `externalProvider` String?
+  - `lastSSOLogin` DateTime?
+
+---
+
+### Backend API Routes
+#### [NEW] [sso/login/route.ts](file:///c:/Projects/Mail-automation/app/sso/login/route.ts)
+Create a GET endpoint at `/sso/login` to process the incoming SPMS SSO token:
+- Retrieve `token` query parameter.
+- Verify JWT using `SPMS_SSO_SECRET` and ensure the issuer is `"SPMS"`.
+- Validate that the token was issued within the last 60 seconds (lifetime check).
+- Decode payload: `email`, `name`, `role`, `company_id`, `issuer`.
+- Map roles:
+  - `MAIL_ADMIN` -> `admin`
+  - `MAIL_EMPLOYEE` -> `employee`
+- Match user by `email` against `Admin` and `Employee` tables.
+  - If user exists: update their `lastSSOLogin` and authenticate them. If the user's role has changed (e.g. from employee to admin), move them to the correct table.
+  - If user does not exist: auto-create the user in the appropriate table and in `User` table, setting `authProvider = 'SPMS'`.
+- Generate session JWT using the application's native `signToken` utility.
+- Set the session token in the client's `token` HTTP-only cookie.
+- Redirect to `/dashboard`.
+
+#### [NEW] [dashboard/route.ts](file:///c:/Projects/Mail-automation/app/dashboard/route.ts)
+Create a GET endpoint at `/dashboard` to act as a router:
+- Check the user's session token from cookies.
+- Decode/verify the token using `verifyToken`.
+- If valid, redirect based on their role:
+  - `admin` -> `/admin/dashboard`
+  - `employee` -> `/employee/dashboard`
+- If invalid or missing, redirect to `/auth/login`.
+
+#### [NEW] [api/internal/users/sync/route.ts](file:///c:/Projects/Mail-automation/app/api/internal/users/sync/route.ts)
+Create a protected POST endpoint at `/api/internal/users/sync` to handle user provisioning/sync requests from SPMS:
+- Authenticate incoming requests by checking the `Authorization: Bearer <token>` or `x-internal-secret` headers against `INTERNAL_API_SECRET`.
+- Accept `{ email, name, role, status }` in the request body.
+- Map the role (`MAIL_ADMIN` -> `admin`, `MAIL_EMPLOYEE` -> `employee`).
+- Check if the user exists in `Admin` or `Employee` tables.
+  - If user exists: Update their name and status. If their role has changed, move the record to the appropriate table.
+  - If user does not exist: Create the user with a secure random password and in `User` table.
+  - Handle user lockouts/deactivation if the status is inactive/disabled (e.g., set `lockedUntil` to a far future date).
+
+---
+
+### Configurations
+#### [MODIFY] [.env](file:///c:/Projects/Mail-automation/.env) and [.env.example](file:///c:/Projects/Mail-automation/.env.example)
+- Add `SPMS_SSO_SECRET` (used to verify SPMS SSO tokens).
+- Add `INTERNAL_API_SECRET` (used to secure the user sync endpoint).
+
+---
+
+### Reports
+#### [NEW] [MAIL_SPMS_SSO_REPORT.md](file:///c:/Projects/Mail-automation/MAIL_SPMS_SSO_REPORT.md)
+Create a report detailing the implementation, database changes, test flow, and environment variables.
+
+---
+
+## Verification Plan
+
+### Automated Database Setup
+- Execute `npx prisma migrate dev --name add_sso_fields` to apply database schema changes and generate the client.
+
+### Manual Verification
+1. **Mock Token Generation & Login Flow**:
+   - Write a test script `scratch/test_sso_login.ts` that generates a signed JWT from SPMS containing a mock user payload and an issue time (`iat`).
+   - Run the script to print a URL `/sso/login?token=<jwt>`.
+   - Access this URL using the browser subagent or curl to verify:
+     - The user is logged in.
+     - The session cookie `token` is correctly set.
+     - The user is redirected to `/dashboard`, which then redirects to their correct dashboard page based on role.
+     - The database contains the new SSO-authenticated user (or the existing user gets their `lastSSOLogin` updated).
+2. **Security Checks**:
+   - Verify that an unsigned token is rejected with an error (401).
+   - Verify that a token with an issue time older than 60 seconds is rejected.
+   - Verify that local authentication (normal username and password login) still works.
+3. **Internal User Sync API Testing**:
+   - Create a test script `scratch/test_user_sync.ts` that makes a POST request to `/api/internal/users/sync` with different headers and payloads.
+   - Verify that requests without the valid `INTERNAL_API_SECRET` are blocked (401).
+   - Verify that a user is successfully created/updated and roles are transitioned properly.

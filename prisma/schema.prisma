@@ -21,6 +21,9 @@ model Admin {
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
   apiKeys          ApiKey[]
+  authProvider     String    @default("LOCAL")
+  externalProvider String?
+  lastSSOLogin     DateTime?
 }
 
 model Employee {
@@ -40,6 +43,9 @@ model Employee {
   userAiKeys       UserAiKey[]
   assignedProjects Project[]         @relation("EmployeeProjects")
   attendanceLogs   AttendanceLog[]
+  authProvider     String    @default("LOCAL")
+  externalProvider String?
+  lastSSOLogin     DateTime?
 }
 
 // Per-employee AI provider API keys
@@ -143,9 +149,12 @@ model AdminMailHistory {
 }
 
 model User {
-  id    String  @id @default(uuid())
-  email String  @unique
-  name  String?
+  id               String    @id @default(uuid())
+  email            String    @unique
+  name             String?
+  authProvider     String    @default("LOCAL")
+  externalProvider String?
+  lastSSOLogin     DateTime?
 }
 
 model Client {

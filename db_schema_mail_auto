@@ -1,0 +1,413 @@
+# Database Schema Documentation
+
+This document describes the schema structure, tables, types, constraints, and relationships for the application, based on the definitions in [schema.prisma](file:///c:/Projects/Mail-automation/prisma/schema.prisma).
+
+## Entity-Relationship Diagram
+
+```mermaid
+erDiagram
+  Admin {
+    String id PK
+    String email UK
+    String password
+    String name
+    Boolean twoFactorEnabled
+    String twoFactorMethod
+    String twoFactorSecret
+    String backupCodes
+    Int failedAttempts
+    DateTime lockedUntil
+  }
+  
+  ApiKey {
+    String id PK
+    String name
+    String hashedKey UK
+    String maskedKey
+    Boolean isActive
+    String adminId FK
+  }
+
+  Employee {
+    String id PK
+    String email UK
+    String username UK
+    String password
+    String name
+    Boolean isFirstLogin
+    Boolean twoFactorEnabled
+    Int failedAttempts
+    DateTime lockedUntil
+  }
+
+  UserAiKey {
+    String id PK
+    String employeeId FK
+    String provider
+    String hashedKey
+    String maskedKey
+    Boolean isActive
+  }
+
+  EmailConfig {
+    String id PK
+    String name
+    String host
+    Int port
+    String email UK
+    String password
+  }
+
+  EmailAssignment {
+    String id PK
+    String employeeId FK
+    String emailAccountId FK
+  }
+
+  Email {
+    String id PK
+    String to
+    String cc
+    String bcc
+    String fromEmail
+    String subject
+    String body
+    String status
+    String senderId FK
+    String adminSenderId
+    String configId FK
+    String adminComment
+    String attachments
+    DateTime scheduledAt
+  }
+
+  OTP {
+    String id PK
+    String email
+    String code
+    DateTime expiresAt
+  }
+
+  Contact {
+    String id PK
+    String name
+    String email UK
+  }
+
+  AdminMailHistory {
+    String id PK
+    String to
+    String cc
+    String bcc
+    String subject
+    String body
+    String status
+  }
+
+  User {
+    String id PK
+    String email UK
+    String name
+  }
+
+  Client {
+    String id PK
+    String name
+    String primaryMail UK
+    String secondaryMail
+    String optionalMail
+  }
+
+  Project {
+    String id PK
+    String name
+    String shortName
+    String shortName2
+    String clientId FK
+  }
+
+  Target {
+    String id PK
+    String clientId FK
+    String projectId FK
+    Int mailCount
+    String frequency
+    Int currentCount
+    Boolean isCompleted
+    DateTime lastReset
+  }
+
+  AttendanceLog {
+    String id PK
+    String employeeId FK
+    DateTime clockIn
+    DateTime clockOut
+    String clockInImage
+    String clockOutImage
+  }
+
+  Admin ||--o{ ApiKey : "manages"
+  Employee ||--o{ UserAiKey : "configures"
+  Employee ||--o{ EmailAssignment : "assigned_to"
+  Employee ||--o{ Email : "sends"
+  Employee ||--o{ AttendanceLog : "logs"
+  Employee }o--o{ Project : "works_on"
+  
+  EmailConfig ||--o{ EmailAssignment : "assigned_to"
+  EmailConfig ||--o{ Email : "configured_by"
+  
+  Client ||--o{ Project : "owns"
+  Client ||--o{ Target : "monitored_by"
+  Project ||--o{ Target : "targeted_by"
+```
+
+---
+
+## Tables Structure Reference
+
+### 1. `Admin`
+Stores administrator accounts credentials, status, and Multi-Factor Authentication configurations.
+
+| Field Name | Type | Modifiers / Attributes | Default / Description |
+| :--- | :--- | :--- | :--- |
+| `id` | `String` | `@id`, UUID | Primary key |
+| `email` | `String` | `@unique` | Admin login email |
+| `password` | `String` | | Hashed password |
+| `name` | `String` | | Admin display name |
+| `twoFactorEnabled` | `Boolean` | | `false` |
+| `twoFactorMethod` | `String?` | | `"email"` |
+| `twoFactorSecret` | `String?` | | Secret key for Authenticator apps |
+| `backupCodes` | `String?` | | Backup recovery codes |
+| `failedAttempts` | `Int` | | `0` (tracks failed log-in attempts) |
+| `lockedUntil` | `DateTime?` | | Cooldown block timestamp after repeated login failures |
+| `createdAt` | `DateTime` | | `now()` |
+| `updatedAt` | `DateTime` | `@updatedAt` | Auto-updates on edit |
+
+---
+
+### 2. `Employee`
+Maintains records for employee staff accounts, first-time status, lock limits, and associations.
+
+| Field Name | Type | Modifiers / Attributes | Default / Description |
+| :--- | :--- | :--- | :--- |
+| `id` | `String` | `@id`, UUID | Primary key |
+| `email` | `String` | `@unique` | Employee email |
+| `username` | `String` | `@unique` | Unique login username |
+| `password` | `String` | | Hashed password |
+| `name` | `String` | | Full name |
+| `isFirstLogin` | `Boolean` | | `true` (forces password change on first login) |
+| `twoFactorEnabled` | `Boolean` | | `false` |
+| `failedAttempts` | `Int` | | `0` (tracks failed log-in attempts) |
+| `lockedUntil` | `DateTime?` | | Cooldown block timestamp |
+| `createdAt` | `DateTime` | | `now()` |
+| `updatedAt` | `DateTime` | `@updatedAt` | |
+
+---
+
+### 3. `UserAiKey`
+Stores API keys of AI providers defined by employees.
+
+| Field Name | Type | Modifiers / Attributes | Default / Description |
+| :--- | :--- | :--- | :--- |
+| `id` | `String` | `@id`, UUID | Primary key |
+| `employeeId` | `String` | Foreign Key (Cascade) | Belongs to `Employee.id` |
+| `provider` | `String` | | AI Provider (e.g. `"openai"`, `"gemini"`, `"groq"`, `"claude"`, `"openrouter"`) |
+| `hashedKey` | `String` | | Encrypted/hashed key value |
+| `maskedKey` | `String` | | Partially hidden key (e.g. `gsk-...abcd`) |
+| `isActive` | `Boolean` | | `true` |
+| `createdAt` | `DateTime` | | `now()` |
+| `updatedAt` | `DateTime` | `@updatedAt` | |
+
+*Constraints:* `@unique([employeeId, provider])` (One active key configuration per provider per employee).
+
+---
+
+### 4. `EmailConfig`
+Details for standard SMTP email accounts to be automated.
+
+| Field Name | Type | Modifiers / Attributes | Default / Description |
+| :--- | :--- | :--- | :--- |
+| `id` | `String` | `@id`, UUID | Primary Key |
+| `name` | `String` | | `"Mail Automation"` |
+| `host` | `String` | | SMTP Host Address |
+| `port` | `Int` | | SMTP Connection Port |
+| `email` | `String` | `@unique` | Email Address credentials |
+| `password` | `String` | | SMTP Password credentials |
+| `createdAt` | `DateTime` | | `now()` |
+| `updatedAt` | `DateTime` | `@updatedAt` | |
+
+---
+
+### 5. `EmailAssignment`
+Resolves assignment mapping between Employees and SMTP configurations.
+
+| Field Name | Type | Modifiers / Attributes | Default / Description |
+| :--- | :--- | :--- | :--- |
+| `id` | `String` | `@id`, UUID | Primary Key |
+| `employeeId` | `String` | Foreign Key (Cascade) | Maps to `Employee.id` |
+| `emailAccountId` | `String` | Foreign Key (Cascade) | Maps to `EmailConfig.id` |
+
+*Constraints:* `@unique([employeeId, emailAccountId])` (Prevent duplicate identical assignments).
+
+---
+
+### 6. `Email`
+Stores details of standard and scheduled outgoing emails.
+
+| Field Name | Type | Modifiers / Attributes | Default / Description |
+| :--- | :--- | :--- | :--- |
+| `id` | `String` | `@id`, UUID | Primary Key |
+| `to` | `String?` | | Primary recipient(s) |
+| `cc` | `String?` | | Carbon Copy recipient(s) |
+| `bcc` | `String?` | | Blind Carbon Copy recipient(s) |
+| `fromEmail` | `String?` | | Originating address |
+| `subject` | `String` | | Email subject |
+| `body` | `String` | | HTML or plain body content |
+| `status` | `String` | | `"PENDING"`, `"SENT"`, `"FAILED"`, `"PAUSED"` |
+| `senderId` | `String?` | Foreign Key (Cascade) | Maps to `Employee.id` |
+| `adminSenderId` | `String?` | | Optional fallback reference to Admin sender |
+| `configId` | `String?` | Foreign Key (Cascade) | Maps to target `EmailConfig.id` |
+| `adminComment` | `String?` | | Moderator/Admin notes |
+| `attachments` | `String?` | | Paths or JSON array representing attachments |
+| `scheduledAt` | `DateTime?` | | Execution time for scheduler |
+| `createdAt` | `DateTime` | | `now()` |
+| `updatedAt` | `DateTime` | `@updatedAt` | |
+
+---
+
+### 7. `OTP`
+One-time passcode transactions.
+
+| Field Name | Type | Modifiers / Attributes | Default / Description |
+| :--- | :--- | :--- | :--- |
+| `id` | `String` | `@id`, UUID | Primary Key |
+| `email` | `String` | | Associated email |
+| `code` | `String` | | Verification code |
+| `expiresAt` | `DateTime` | | Validity limit |
+| `createdAt` | `DateTime` | | `now()` |
+
+---
+
+### 8. `ApiKey`
+API credentials for administrative external API integrations.
+
+| Field Name | Type | Modifiers / Attributes | Default / Description |
+| :--- | :--- | :--- | :--- |
+| `id` | `String` | `@id`, UUID | Primary Key |
+| `name` | `String` | | Friendly descriptive identifier |
+| `hashedKey` | `String` | `@unique` | Securely stored hash |
+| `maskedKey` | `String` | | Readable reference key prefix |
+| `isActive` | `Boolean` | | `true` |
+| `adminId` | `String` | Foreign Key (Cascade) | Parent creator `Admin.id` |
+| `createdAt` | `DateTime` | | `now()` |
+| `updatedAt` | `DateTime` | `@updatedAt` | |
+
+---
+
+### 9. `Contact`
+Stand-alone customer contact information index.
+
+| Field Name | Type | Modifiers / Attributes | Default / Description |
+| :--- | :--- | :--- | :--- |
+| `id` | `String` | `@id`, UUID | Primary Key |
+| `name` | `String` | | |
+| `email` | `String` | `@unique` | |
+| `createdAt` | `DateTime` | | `now()` |
+| `updatedAt` | `DateTime` | `@updatedAt` | |
+
+---
+
+### 10. `AdminMailHistory`
+Read-only logs of emails sent by the Admin panel.
+
+| Field Name | Type | Modifiers / Attributes | Default / Description |
+| :--- | :--- | :--- | :--- |
+| `id` | `String` | `@id`, UUID | Primary Key |
+| `to` | `String` | | Primary recipient |
+| `cc` | `String?` | | |
+| `bcc` | `String?` | | |
+| `subject` | `String` | | |
+| `body` | `String` | | |
+| `status` | `String` | | `"SENT"` |
+| `createdAt` | `DateTime` | | `now()` |
+| `updatedAt` | `DateTime` | `@updatedAt` | |
+
+---
+
+### 11. `User`
+Generic metadata profile definition.
+
+| Field Name | Type | Modifiers / Attributes | Default / Description |
+| :--- | :--- | :--- | :--- |
+| `id` | `String` | `@id`, UUID | Primary Key |
+| `email` | `String` | `@unique` | |
+| `name` | `String?` | | |
+
+---
+
+### 12. `Client`
+Client record profile.
+
+| Field Name | Type | Modifiers / Attributes | Default / Description |
+| :--- | :--- | :--- | :--- |
+| `id` | `String` | `@id`, UUID | Primary Key |
+| `name` | `String` | | Organization name |
+| `primaryMail` | `String` | `@unique` | Main notification/invoice email |
+| `secondaryMail` | `String?` | | Secondary point of contact |
+| `optionalMail` | `String?` | | Optional fallback mail |
+| `createdAt` | `DateTime` | | `now()` |
+| `updatedAt` | `DateTime` | `@updatedAt` | |
+
+---
+
+### 13. `Project`
+Corporate projects tracked under clients.
+
+| Field Name | Type | Modifiers / Attributes | Default / Description |
+| :--- | :--- | :--- | :--- |
+| `id` | `String` | `@id`, UUID | Primary Key |
+| `name` | `String` | | Project name |
+| `shortName` | `String?` | | Acronym abbreviation |
+| `shortName2` | `String?` | | Alternative short label |
+| `clientId` | `String` | Foreign Key (Cascade) | Belongs to `Client.id` |
+| `createdAt` | `DateTime` | | `now()` |
+| `updatedAt` | `DateTime` | `@updatedAt` | |
+
+*Relations:* Many-to-many relationship with `Employee` via the `@relation("EmployeeProjects")` helper.
+*Constraints:* `@unique([clientId, name])` (Prevents duplicate project names under the same client).
+
+---
+
+### 14. `Target`
+Quota targets for automated emails associated with clients and projects.
+
+| Field Name | Type | Modifiers / Attributes | Default / Description |
+| :--- | :--- | :--- | :--- |
+| `id` | `String` | `@id`, UUID | Primary Key |
+| `clientId` | `String` | Foreign Key (Cascade) | Belongs to `Client.id` |
+| `projectId` | `String` | Foreign Key (Cascade) | Belongs to `Project.id` |
+| `mailCount` | `Int` | | Target email frequency quota |
+| `frequency` | `String` | | `"DAILY"`, `"WEEKLY"`, `"MONTHLY"` |
+| `currentCount` | `Int` | | `0` (running count towards goal) |
+| `isCompleted` | `Boolean` | | `false` |
+| `lastReset` | `DateTime` | | `now()` (indicates the time of the last quota period reset) |
+| `createdAt` | `DateTime` | | `now()` |
+| `updatedAt` | `DateTime` | `@updatedAt` | |
+
+*Constraints:* `@unique([clientId, projectId])` (Exactly one target configuration map for each project-client pair).
+
+---
+
+### 15. `AttendanceLog`
+Time clocking data logging logins and clock-in/out visual proof details for employees.
+
+| Field Name | Type | Modifiers / Attributes | Default / Description |
+| :--- | :--- | :--- | :--- |
+| `id` | `String` | `@id`, UUID | Primary Key |
+| `employeeId` | `String` | Foreign Key (Cascade) | Identifies logged `Employee.id` |
+| `clockIn` | `DateTime` | | `now()` (Start shift timestamp) |
+| `clockOut` | `DateTime?` | | End shift timestamp |
+| `clockInImage` | `String?` | | Filepath or URL of verification image at check-in |
+| `clockOutImage` | `String?` | | Filepath or URL of verification image at check-out |
+| `createdAt` | `DateTime` | | `now()` |
+| `updatedAt` | `DateTime` | `@updatedAt` | |
