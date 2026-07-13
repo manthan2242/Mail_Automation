@@ -78,6 +78,19 @@ export async function OPTIONS(request: NextRequest) {
   return new NextResponse(null, { status: 200, headers });
 }
 
+function getBaseUrl(request: NextRequest) {
+  const envUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL;
+  if (process.env.NODE_ENV === 'production' && envUrl) {
+    return envUrl;
+  }
+  
+  let requestUrl = request.url;
+  if (requestUrl.includes('//0.0.0.0')) {
+    requestUrl = requestUrl.replace('//0.0.0.0', '//192.168.1.6');
+  }
+  return requestUrl;
+}
+
 export async function GET(request: NextRequest) {
   const startTime = Date.now();
   const clientIp = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 
@@ -85,11 +98,8 @@ export async function GET(request: NextRequest) {
                    'unknown';
   const reqHeaders = Object.fromEntries(request.headers.entries());
 
-  let requestUrl = request.url;
-  if (requestUrl.includes('//0.0.0.0')) {
-    requestUrl = requestUrl.replace('//0.0.0.0', '//192.168.1.6');
-  }
-  const { searchParams } = new URL(requestUrl);
+  const requestUrl = getBaseUrl(request);
+  const { searchParams } = new URL(request.url);
   const token = searchParams.get('token');
 
   if (!token) {
